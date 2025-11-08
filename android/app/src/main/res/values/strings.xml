@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AyshasApp</string>
+    <string name="title_activity_main">AyshasApp</string>
+    <string name="package_name">com.ayshas.app</string>
+    <string name="custom_url_scheme">com.ayshas.app</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Allows sharing files from external storage (like /storage/emulated/0/Download/) -->
+    <external-path name="external_files" path="." />
+    
+    <!-- Allows sharing temporary cache files your app creates -->
+    <cache-path name="cache_files" path="." />
+
+    <!-- Optional: internal files if you write to internal app storage -->
+    <files-path name="internal_files" path="." />
+</paths>
