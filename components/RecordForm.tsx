@@ -137,10 +137,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pb-24">
       {/* Date and Sales */}
-      <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="date" className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+            <label htmlFor="date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date</label>
             <input
               type="date"
               id="date"
@@ -148,13 +148,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
               value={formData.date}
               onChange={handleInputChange}
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
             />
           </div>
           <div>
-            <label htmlFor="totalSales" className="block text-sm font-medium text-slate-700 mb-1">Total Sales</label>
+            <label htmlFor="totalSales" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Sales</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">₹</span>
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
               <input
                 type="number"
                 id="totalSales"
@@ -162,7 +162,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                 value={formData.totalSales === 0 ? '' : formData.totalSales}
                 onChange={handleInputChange}
                 required
-                className="w-full pl-7 px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                className="w-full pl-7 px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
                 placeholder="0"
               />
             </div>
@@ -173,12 +173,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
 
       {/* Expenses */}
       <div className="space-y-3">
-        <h3 className="text-xl font-semibold text-slate-800 px-1">Expenses</h3>
+        <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100 px-1">Expenses</h3>
         {formData.expenses.map((category, catIndex) => {
           const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
           const isOpen = openCategory === category.name;
           return (
-            <div key={category.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div key={category.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
               <button
                 type="button"
                 onClick={() => toggleCategory(category.name)}
@@ -187,29 +187,29 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
               >
                 <div>
                   <h4 className="text-lg font-semibold text-primary">{category.name}</h4>
-                  <p className="text-sm text-slate-500">Total: ₹{categoryTotal.toLocaleString('en-IN')}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Total: ₹{categoryTotal.toLocaleString('en-IN')}</p>
                 </div>
-                {isOpen ? <ChevronUpIcon className="w-6 h-6 text-slate-500" /> : <ChevronDownIcon className="w-6 h-6 text-slate-500" />}
+                {isOpen ? <ChevronUpIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /> : <ChevronDownIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />}
               </button>
               {isOpen && (
-                <div className="p-4 border-t border-slate-200">
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700">
                   <div className="space-y-4">
                     {category.items.map((item, itemIndex) => (
                       <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3">
-                        <label htmlFor={`${category.id}-${item.id}`} className="text-slate-700 font-medium pr-2 truncate">{item.name}</label>
-                        <button type="button" onClick={() => removeExpenseItem(catIndex, itemIndex)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50" aria-label={`Remove ${item.name}`}>
+                        <label htmlFor={`${category.id}-${item.id}`} className="text-slate-700 dark:text-slate-300 font-medium pr-2 truncate">{item.name}</label>
+                        <button type="button" onClick={() => removeExpenseItem(catIndex, itemIndex)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20" aria-label={`Remove ${item.name}`}>
                           <TrashIcon className="w-5 h-5"/>
                         </button>
                         <div className="flex items-center gap-2 col-span-2">
                           <div className="relative flex-grow">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">₹</span>
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
                             <input
                               type="number"
                               step="0.01"
                               id={`${category.id}-${item.id}`}
                               value={item.amount === 0 ? '' : item.amount}
                               onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)}
-                              className="w-full pl-7 pr-2 py-1.5 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                              className="w-full pl-7 pr-2 py-1.5 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
                               placeholder="0"
                             />
                           </div>
@@ -233,24 +233,24 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
       </div>
       
       {/* Sticky Footer */}
-      <div className="fixed left-0 right-0 bg-white/95 backdrop-blur-sm shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
+      <div className="fixed left-0 right-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm shadow-[0_-2px_10px_rgba(0,0,0,0.05)] dark:border-t dark:border-slate-700 z-20 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
         <div className="container mx-auto px-4 py-3">
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                 <div>
-                    <p className="text-xs text-slate-500">Sales</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Sales</p>
                     <p className="font-bold text-primary truncate">₹{formData.totalSales.toLocaleString('en-IN')}</p>
                 </div>
                 <div>
-                    <p className="text-xs text-slate-500">Expenses</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Expenses</p>
                     <p className="font-bold text-error truncate">₹{totalExpenses.toLocaleString('en-IN')}</p>
                 </div>
                 <div>
-                    <p className="text-xs text-slate-500">{profit >= 0 ? 'Profit' : 'Loss'}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{profit >= 0 ? 'Profit' : 'Loss'}</p>
                     <p className={`font-bold ${profit >= 0 ? 'text-success' : 'text-error'} truncate`}>₹{Math.abs(profit).toLocaleString('en-IN')}</p>
                 </div>
             </div>
           <div className="flex justify-end items-center space-x-3">
-            <button type="button" onClick={onCancel} className="px-5 py-2.5 border border-slate-300 rounded-md text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button>
+            <button type="button" onClick={onCancel} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">Cancel</button>
             <button type="submit" className="px-5 py-2.5 bg-secondary text-white rounded-md text-sm font-semibold hover:bg-primary shadow-sm">Save Record</button>
           </div>
         </div>
@@ -258,17 +258,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
       
       {isAddItemModalOpen && (
         <Modal onClose={() => setAddItemModalOpen(false)}>
-            <div className="p-2">
-                <h3 className="text-xl font-bold mb-4">Add New Expense Item</h3>
+            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Add New Expense Item</h3>
                 <div className="space-y-4">
                     <div>
-                        <label htmlFor="newItemName" className="block text-sm font-medium text-slate-700 mb-1">Item Name</label>
+                        <label htmlFor="newItemName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Item Name</label>
                         <input
                             type="text"
                             id="newItemName"
                             value={newItem.name}
                             onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
                             placeholder="e.g., New Supplier"
                         />
                     </div>
@@ -278,13 +278,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                             type="checkbox"
                             checked={newItem.saveForFuture}
                             onChange={(e) => setNewItem({...newItem, saveForFuture: e.target.checked})}
-                            className="h-4 w-4 text-primary border-slate-300 rounded focus:ring-primary"
+                            className="h-4 w-4 text-primary border-slate-300 rounded focus:ring-primary dark:bg-slate-700 dark:border-slate-600"
                         />
-                        <label htmlFor="saveForFuture" className="ml-2 block text-sm text-slate-900">Save this item for future entries</label>
+                        <label htmlFor="saveForFuture" className="ml-2 block text-sm text-slate-900 dark:text-slate-300">Save this item for future entries</label>
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end space-x-3">
-                    <button type="button" onClick={() => setAddItemModalOpen(false)} className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-100">Cancel</button>
+                    <button type="button" onClick={() => setAddItemModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">Cancel</button>
                     <button type="button" onClick={handleAddNewItem} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-primary">Add Item</button>
                 </div>
             </div>

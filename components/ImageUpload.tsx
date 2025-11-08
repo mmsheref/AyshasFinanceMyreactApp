@@ -100,7 +100,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhoto, onPhotoChange }) =
       <button
         type="button"
         onClick={handleIconClick}
-        className={`p-2 rounded-full transition-colors ${billPhoto ? 'text-blue-600 bg-blue-100 hover:bg-blue-200' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'}`}
+        className={`p-2 rounded-full transition-colors ${billPhoto ? 'text-blue-600 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/50 dark:hover:bg-blue-900/80 dark:text-blue-400' : 'text-gray-500 bg-gray-100 hover:bg-gray-200 dark:bg-slate-600 dark:hover:bg-slate-500 dark:text-slate-300'}`}
         title={billPhoto ? 'View Bill' : 'Upload Bill'}
       >
         {billPhoto ? <EyeIcon className="w-5 h-5" /> : <CameraIcon className="w-5 h-5" />}

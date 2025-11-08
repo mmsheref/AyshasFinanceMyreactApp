@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { DailyRecord, ExpenseCategory, ExpenseItem, CustomExpenseStructure, BackupData } from '../types';
 import Modal from './Modal';
 import { DownloadIcon, UploadIcon, ShareIcon } from './Icons';
-import { saveBackupFile, shareBackupData } from '../utils/capacitor-utils';
+import { saveBackupFile, shareBackupData, saveCsvFile } from '../utils/capacitor-utils';
+import { convertToCSV } from '../utils/csv-utils';
 
 interface BackupRestoreProps {
   allRecords: DailyRecord[];
@@ -48,6 +49,21 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
     const jsonString = JSON.stringify(backupData, null, 2);
     const fileName = `ayshas-backup-${new Date().toISOString().split('T')[0]}.json`;
     await saveBackupFile(fileName, jsonString);
+  };
+
+  const handleCsvExport = async () => {
+    if (allRecords.length === 0) {
+      alert("No records to export.");
+      return;
+    }
+    try {
+        const csvData = convertToCSV(allRecords);
+        const fileName = `ayshas-export-${new Date().toISOString().split('T')[0]}.csv`;
+        await saveCsvFile(fileName, csvData);
+    } catch (error) {
+        console.error('Error exporting to CSV:', error);
+        alert('An error occurred during CSV export.');
+    }
   };
   
   const handleShare = async () => {
@@ -114,18 +130,24 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
     setRecordsToImport(null);
   }
 
+  const buttonClass = "flex items-center justify-center px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md transition-colors w-full sm:w-auto";
+
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:space-x-2 gap-2 sm:gap-0">
-        <button onClick={handleBackup} className="flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors w-full sm:w-auto">
+        <button onClick={handleBackup} className={buttonClass}>
             <DownloadIcon className="w-4 h-4 mr-2"/>
             Export Data
         </button>
-        <button onClick={handleShare} className="flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors w-full sm:w-auto">
+         <button onClick={handleCsvExport} className={buttonClass}>
+            <DownloadIcon className="w-4 h-4 mr-2"/>
+            Export CSV
+        </button>
+        <button onClick={handleShare} className={buttonClass}>
             <ShareIcon className="w-4 h-4 mr-2"/>
             Share Data
         </button>
-        <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors w-full sm:w-auto">
+        <button onClick={() => fileInputRef.current?.click()} className={buttonClass}>
             <UploadIcon className="w-4 h-4 mr-2"/>
             Import Data
         </button>
@@ -139,17 +161,17 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
       </div>
       {showModal && recordsToImport && (
         <Modal onClose={cancelRestore}>
-            <div className="p-4 text-center">
-                <h3 className="text-xl font-bold mb-4">Confirm Import</h3>
-                <p className="text-gray-600 mb-2">You are about to import <span className="font-bold">{recordsToImport.records.length}</span> records.</p>
+            <div className="p-4 text-center bg-white dark:bg-slate-800 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Confirm Import</h3>
+                <p className="text-gray-600 dark:text-slate-300 mb-2">You are about to import <span className="font-bold">{recordsToImport.records.length}</span> records.</p>
                  {Object.keys(recordsToImport.customStructure).length > 0 && (
-                  <p className="text-gray-600 mb-2">This will also restore your saved custom expense items.</p>
+                  <p className="text-gray-600 dark:text-slate-300 mb-2">This will also restore your saved custom expense items.</p>
                 )}
-                <p className="text-red-600 font-semibold bg-red-100 p-3 rounded-md mt-4">
+                <p className="text-red-600 font-semibold bg-red-100 dark:bg-red-900/20 dark:text-red-400 p-3 rounded-md mt-4">
                     Warning: This will overwrite all your current data. This action cannot be undone.
                 </p>
                 <div className="mt-6 flex justify-center space-x-4">
-                    <button onClick={cancelRestore} className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100">Cancel</button>
+                    <button onClick={cancelRestore} className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700">Cancel</button>
                     <button onClick={confirmRestore} className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Confirm & Import</button>
                 </div>
             </div>

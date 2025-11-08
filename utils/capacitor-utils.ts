@@ -3,26 +3,27 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
 /**
- * Saves a file to the device. Uses Capacitor Filesystem on native platforms
- * and a standard browser download for web.
- * @param fileName - The name of the file to save.
- * @param data - The string content of the file.
+ * Generic file saver that uses Capacitor Filesystem on native and browser download on web.
+ * @param fileName The name of the file to save.
+ * @param data The string content of the file.
+ * @param mimeType The MIME type for the web download.
+ * @param savedMessage The alert message to show on successful native save.
  */
-export const saveBackupFile = async (fileName: string, data: string): Promise<void> => {
+const saveFile = async (fileName: string, data: string, mimeType: string, savedMessage: string): Promise<void> => {
   try {
     if (Capacitor.isNativePlatform()) {
       // Native: Use Capacitor Filesystem to save in the Documents directory.
       await Filesystem.requestPermissions();
-      const result = await Filesystem.writeFile({
+      await Filesystem.writeFile({
         path: fileName,
         data: data,
         directory: Directory.Documents,
         encoding: Encoding.UTF8,
       });
-      alert(`Backup saved successfully to Documents folder.`);
+      alert(savedMessage);
     } else {
       // Web: Fallback to browser download.
-      const blob = new Blob([data], { type: 'application/json' });
+      const blob = new Blob([data], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -33,9 +34,38 @@ export const saveBackupFile = async (fileName: string, data: string): Promise<vo
       URL.revokeObjectURL(url);
     }
   } catch (error) {
-    console.error('Error saving file:', error);
+    console.error(`Error saving file ${fileName}:`, error);
     alert(`Failed to save file. Error: ${error instanceof Error ? error.message : String(error)}`);
   }
+};
+
+
+/**
+ * Saves the JSON backup file.
+ * @param fileName - The name of the file to save.
+ * @param data - The JSON string content of the file.
+ */
+export const saveBackupFile = async (fileName: string, data: string): Promise<void> => {
+  await saveFile(
+    fileName,
+    data,
+    'application/json',
+    'Backup saved successfully to Documents folder.'
+  );
+};
+
+/**
+ * Saves a CSV export file.
+ * @param fileName - The name of the file to save.
+ * @param data - The CSV string content of the file.
+ */
+export const saveCsvFile = async (fileName: string, data: string): Promise<void> => {
+    await saveFile(
+        fileName,
+        data,
+        'text/csv;charset=utf-8;',
+        'CSV Export saved successfully to Documents folder.'
+    );
 };
 
 /**
@@ -94,11 +124,18 @@ export const shareBackupData = async (fileName: string, data: string, title: str
 export const shareImageFile = async (fileName: string, base64Data: string, title: string, text: string) => {
     try {
         if (Capacitor.isNativePlatform()) {
-            // Capacitor's Share plugin can directly handle base64 data URIs.
+            // Native: Save the base64 data URL as a file in the cache directory,
+            // then share the resulting file URI. The Share plugin expects a file path.
+            const result = await Filesystem.writeFile({
+                path: fileName,
+                data: base64Data, // Capacitor's writeFile can handle data URLs
+                directory: Directory.Cache,
+            });
+
             await Share.share({
                 title: title,
                 text: text,
-                url: base64Data,
+                url: result.uri, // Share the URI of the newly created file.
                 dialogTitle: 'Share Report'
             });
         } else {

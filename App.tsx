@@ -18,6 +18,26 @@ const App: React.FC = () => {
   const [currentRecord, setCurrentRecord] = useState<DailyRecord | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Effect to handle system dark mode changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme(mediaQuery.matches); // Apply theme on initial load
+
+    const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
+    mediaQuery.addEventListener('change', handler);
+
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
   useEffect(() => {
     try {
       const storedRecords = localStorage.getItem('ayshas-records');
@@ -138,9 +158,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
+    <div className="min-h-screen text-slate-800 dark:text-slate-200 font-sans flex flex-col">
       {/* Header */}
-      <header className="bg-primary text-white shadow-md sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+      <header className="bg-primary text-white sticky top-0 z-20 pt-[env(safe-area-inset-top)] dark:border-b dark:border-slate-800">
         <div className="container mx-auto px-4 h-16 flex justify-between items-center">
           <div className="flex items-center">
             {showBackButton ? (
@@ -167,14 +187,14 @@ const App: React.FC = () => {
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 h-24 bg-transparent z-30 pointer-events-none pb-[env(safe-area-inset-bottom)]">
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pointer-events-auto">
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-800 dark:border-t dark:border-slate-700 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] dark:shadow-none pointer-events-auto">
           <div className="flex justify-around items-center h-full">
-            <button onClick={() => navigate('dashboard')} className={`flex flex-col items-center justify-center w-full transition-colors ${view === 'dashboard' ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} aria-label="Dashboard">
+            <button onClick={() => navigate('dashboard')} className={`flex flex-col items-center justify-center w-full transition-colors ${view === 'dashboard' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Dashboard">
               <HomeIcon className="w-6 h-6 mb-1" />
               <span className="text-xs font-medium">Dashboard</span>
             </button>
             <div className="w-20"></div> {/* Spacer for FAB */}
-            <button onClick={() => navigate('records')} className={`flex flex-col items-center justify-center w-full transition-colors ${view === 'records' ? 'text-primary' : 'text-slate-500 hover:text-primary'}`} aria-label="Records">
+            <button onClick={() => navigate('records')} className={`flex flex-col items-center justify-center w-full transition-colors ${view === 'records' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Records">
               <ListIcon className="w-6 h-6 mb-1" />
               <span className="text-xs font-medium">Records</span>
             </button>
@@ -193,12 +213,12 @@ const App: React.FC = () => {
 
       {isSettingsOpen && (
         <Modal onClose={() => setIsSettingsOpen(false)}>
-            <div className="p-4">
-                <h3 className="text-xl font-bold mb-4 text-slate-800">Settings</h3>
+            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Settings</h3>
                 <div className="space-y-4">
                     <div>
-                        <h4 className="text-lg font-semibold mb-2 text-slate-700">Data Management</h4>
-                        <p className="text-slate-600 mb-3">Backup your data to a file or restore from a previous backup.</p>
+                        <h4 className="text-lg font-semibold mb-2 text-slate-700 dark:text-slate-200">Data Management</h4>
+                        <p className="text-slate-600 dark:text-slate-400 mb-3">Backup your data to a file or restore from a previous backup.</p>
                         <BackupRestore 
                             onRestore={handleRestore} 
                             allRecords={records} 

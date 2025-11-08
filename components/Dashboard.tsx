@@ -57,9 +57,9 @@ const Dashboard: React.FC<DashboardProps> = ({ records, onViewRecord }) => {
 
   if (records.length === 0) {
     return (
-      <div className="text-center py-20 bg-white rounded-lg shadow-sm">
-        <h2 className="text-2xl font-semibold text-slate-700">Welcome to Aysha's P&L</h2>
-        <p className="text-slate-500 mt-2">Tap the '+' button below to create your first record.</p>
+      <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold text-slate-700 dark:text-slate-200">Welcome to Aysha's P&L</h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">Tap the '+' button below to create your first record.</p>
       </div>
     );
   }
@@ -74,36 +74,36 @@ const Dashboard: React.FC<DashboardProps> = ({ records, onViewRecord }) => {
     <div className="space-y-6">
         {/* Insight Cards */}
         <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-lg shadow-sm text-center">
-                <h3 className="text-slate-500 font-medium text-sm">Avg. Profit (7d)</h3>
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm text-center">
+                <h3 className="text-slate-500 dark:text-slate-400 font-medium text-sm">Avg. Profit (7d)</h3>
                 <p className="text-2xl mt-1"><ProfitCard value={avg7DayProfit} /></p>
-                <p className="text-xs text-slate-400 mt-1">{daysFor7DayAvg} days</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{daysFor7DayAvg} days</p>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm text-center">
-                <h3 className="text-slate-500 font-medium text-sm">Avg. Profit (30d)</h3>
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm text-center">
+                <h3 className="text-slate-500 dark:text-slate-400 font-medium text-sm">Avg. Profit (30d)</h3>
                 <p className="text-2xl mt-1"><ProfitCard value={avg30DayProfit} /></p>
-                <p className="text-xs text-slate-400 mt-1">{daysFor30DayAvg} days</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{daysFor30DayAvg} days</p>
             </div>
         </div>
 
         {/* Chart */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Profit/Loss Trend</h3>
+        <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-lg shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">Profit/Loss Trend</h3>
             <Chart data={chartData} />
         </div>
 
         {/* Recent Records */}
-        <div className="bg-white rounded-lg shadow-sm">
-            <h3 className="text-lg font-bold text-slate-800 p-4 border-b border-slate-100">Recent Activity</h3>
-            <ul className="divide-y divide-slate-100">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 p-4 border-b border-slate-100 dark:border-slate-700">Recent Activity</h3>
+            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
                 {records.slice(0, 5).map(record => {
                     const totalExpenses = calculateTotalExpenses(record);
                     const profit = record.totalSales - totalExpenses;
                     return (
-                        <li key={record.id} onClick={() => onViewRecord(record)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+                        <li key={record.id} onClick={() => onViewRecord(record)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700">
                             <div>
-                                <p className="font-semibold text-slate-700">{new Date(record.date).toLocaleDateString('en-GB', { month: 'long', day: 'numeric' })}</p>
-                                <p className="text-sm text-slate-500">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long' })}</p>
+                                <p className="font-semibold text-slate-700 dark:text-slate-200">{new Date(record.date).toLocaleDateString('en-GB', { month: 'long', day: 'numeric' })}</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long' })}</p>
                             </div>
                             <p className={`font-bold text-lg ${profit >= 0 ? 'text-success' : 'text-error'}`}>
                                 {profit >= 0 ? '+' : '-'}₹{Math.abs(profit).toLocaleString('en-IN')}
