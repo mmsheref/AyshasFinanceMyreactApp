@@ -1,56 +1,173 @@
-name: Build Signed APK
+name: Build Signed Release APK
 
-on: [push]
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync android
-
-      - uses: actions/setup-java@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          distribution: temurin
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Clean old assets
+        run: |
+          rm -rf android/app/src/main/assets/public
+          rm -rf dist
+
+      - name: Build React app
+        run: |
+          npm run build
+          ls -R dist
+
+      - name: Sync to Android
+        run: |
+          npx cap sync android
+          ls -R android/app/src/main/assets/public
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
           java-version: '21'
 
-      # PLACE KEYSTORE
-      - name: Place Keystore
+      # -----------------------------------------------------------------
+      # 1. Decode & place the keystore
+      # -----------------------------------------------------------------
+      - name: Decode & Place Keystore
         run: |
           mkdir -p android/app/app
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/app/release.keystore
           chmod 600 android/app/app/release.keystore
+          echo "Keystore placed at: $(pwd)/android/app/app/release.keystore"
+          ls -la android/app/app/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # CONFIRM FILE EXISTS
-      - name: Confirm Keystore
+      # -----------------------------------------------------------------
+      # 2. DEBUG – show that secrets are loaded
+      # -----------------------------------------------------------------
+      - name: DEBUG – Show Secret Status
+        env:
+          PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ls -la android/app/app/release.keystore
-          file android/app/app/release.keystore
+          echo "=== SECRET DEBUG INFO ==="
+          echo "KEYSTORE_PASSWORD length: ${#PASS}"
+          echo "KEY_ALIAS length: ${#ALIAS}"
+          echo "KEY_PASSWORD length: ${#KEY_PASS}"
+          echo "KEY_ALIAS value: '$ALIAS'"
+          echo "KEYSTORE_PASSWORD value: '$PASS'"
+          echo "KEY_PASSWORD value: '$KEY_PASS'"
+          echo "=========================="
+          [ -z "$PASS" ] && echo "KEYSTORE_PASSWORD is EMPTY!" && exit 1
+          [ -z "$ALIAS" ] && echo "KEY_ALIAS is EMPTY!" && exit 1
+          [ -z "$KEY_PASS" ] && echo "KEY_PASSWORD is EMPTY!" && exit 1
 
-      # BUILD WITH ABSOLUTE PATH
-      - name: Build APK
+      # -----------------------------------------------------------------
+      # 3. VALIDATE keystore + credentials (fails fast with full output)
+      # -----------------------------------------------------------------
+      - name: Validate Keystore & Credentials
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          KEYSTORE_PATH="android/app/app/release.keystore"
+          echo "=== VALIDATING KEYSTORE ==="
+          echo "Path: $KEYSTORE_PATH"
+          [ ! -f "$KEYSTORE_PATH" ] && echo "FILE NOT FOUND!" && exit 1
+          echo "File size: $(stat -c%s "$KEYSTORE_PATH") bytes"
+
+          echo "Testing with:"
+          echo "  Alias: '$KEY_ALIAS'"
+          echo "  Store Password: '$KEYSTORE_PASSWORD'"
+          echo "  Key Password: '$KEY_PASSWORD'"
+
+          if keytool -list \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > keytool_output.txt 2>&1; then
+            echo "VALIDATED: Keystore + credentials are correct"
+            rm keytool_output.txt
+          else
+            echo "VALIDATION FAILED"
+            echo "keytool output:"
+            cat keytool_output.txt
+            rm keytool_output.txt
+            exit 1
+          fi
+
+      # -----------------------------------------------------------------
+      # 4. Clean Gradle (prevents daemon from using a stale path)
+      # -----------------------------------------------------------------
+      - name: Clean Gradle
+        working-directory: android
+        run: ./gradlew clean
+
+      # -----------------------------------------------------------------
+      # 5. BUILD – **absolute path** + stacktrace
+      # -----------------------------------------------------------------
+      - name: Build Signed Release APK
         working-directory: android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          PATH="${{ github.workspace }}/android/app/app/release.keystore"
+          ABS_PATH="${{ github.workspace }}/android/app/app/release.keystore"
+          echo "Using absolute keystore path: $ABS_PATH"
+          [ ! -f "$ABS_PATH" ] && echo "Keystore missing at absolute path!" && exit 1
+
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="$PATH" \
+            -Pandroid.injected.signing.store.file="$ABS_PATH" \
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+            --stacktrace
 
-      # UPLOAD
-      - uses: actions/upload-artifact@v4
+      # -----------------------------------------------------------------
+      # 6. Verify the APK was created
+      # -----------------------------------------------------------------
+      - name: Verify APK
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          [ -f "$APK" ] && echo "APK BUILT: $APK" && ls -lh "$APK" || (echo "APK NOT FOUND!" && exit 1)
+
+      # -----------------------------------------------------------------
+      # 7. Upload artifact
+      # -----------------------------------------------------------------
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release-signed
           path: android/app/build/outputs/apk/release/app-release.apk
+
+      # -----------------------------------------------------------------
+      # 8. Create GitHub Release
+      # -----------------------------------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Release #${{ github.run_number }}"
+          body: |
+            Signed APK built successfully
+            Commit: ${{ github.sha }}
+          files: android/app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
