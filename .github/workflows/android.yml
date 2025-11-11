@@ -50,7 +50,7 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # Place keystore exactly where Gradle expects it: android/app/app/release.keystore
+      # Decode and place keystore where Gradle expects it (android/app/app/release.keystore)
       - name: Decode Keystore (to expected Gradle path)
         run: |
           echo "Creating android/app/app directory..."
@@ -58,36 +58,47 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/app/release.keystore
           chmod 600 android/app/app/release.keystore
           echo "Keystore placed at android/app/app/release.keystore"
+          ls -la android/app/app/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # Verify keystore is in the correct location before build
-      - name: Verify Keystore Location
-        working-directory: android
+      # Validate keystore and credentials
+      - name: Validate Keystore & Credentials
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "Expected path: app/app/release.keystore"
-          if [ -f app/app/release.keystore ]; then
-            echo "Keystore FOUND and ready"
-            ls -la app/app/release.keystore
-          else
-            echo "ERROR: Keystore NOT found at app/app/release.keystore"
-            exit 1
-          fi
+          echo "Testing keystore with alias: $KEY_ALIAS"
+          keytool -list \
+            -keystore android/app/app/release.keystore \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null 2>&1 && echo "VALIDATED" || (echo "INVALID CREDENTIALS" && exit 1)
 
       - name: Clean Android Gradle cache
         working-directory: android
         run: ./gradlew clean
 
-      # Build and sign Release APK using relative path (now matches actual file location)
+      # Build and sign Release APK (using ABSOLUTE PATH to avoid daemon resolution bug)
       - name: Build Signed Release APK
         working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo "Building signed release APK..."
+          echo "Using alias: $KEY_ALIAS"
+          echo "Password lengths: store=${#KEYSTORE_PASSWORD}, key=${#KEY_PASSWORD}"
+
+          ABSOLUTE_KEYSTORE_PATH="${{ github.workspace }}/android/app/app/release.keystore"
+          echo "Absolute keystore path: $ABSOLUTE_KEYSTORE_PATH"
+          ls -la "$ABSOLUTE_KEYSTORE_PATH" || (echo "Keystore not found at absolute path!" && exit 1)
+
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=app/release.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+            -Pandroid.injected.signing.store.file="$ABSOLUTE_KEYSTORE_PATH" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
       # Verify that APK exists
       - name: Verify APK existence
