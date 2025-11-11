@@ -23,62 +23,94 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Clean old web assets
+      - name: Clean old assets
         run: |
-          echo "Cleaning old assets and dist folders..."
           rm -rf android/app/src/main/assets/public
           rm -rf dist
-          echo "Clean complete."
 
-      - name: Build React app with Vite
+      - name: Build React app
         run: |
-          echo "Running Vite production build..."
           npm run build
-          echo "Build complete. Contents of dist/:"
           ls -R dist
 
-      - name: Sync Capacitor Android project
+      - name: Sync to Android
         run: |
-          echo "Copying new web assets to Android..."
           npx cap sync android
-          echo "Assets copied to android/app/src/main/assets/public"
           ls -R android/app/src/main/assets/public
 
-      - name: Set up Java (JDK 21)
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      # Decode and place keystore where Gradle expects it (android/app/app/release.keystore)
-      - name: Decode Keystore (to expected Gradle path)
+      # PLACE KEYSTORE
+      - name: Decode & Place Keystore
         run: |
-          echo "Creating android/app/app directory..."
           mkdir -p android/app/app
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/app/release.keystore
           chmod 600 android/app/app/release.keystore
-          echo "Keystore placed at android/app/app/release.keystore"
+          echo "Keystore placed at: $(pwd)/android/app/app/release.keystore"
           ls -la android/app/app/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # Validate keystore and credentials
+      # DEBUG: Show what secrets are loaded
+      - name: DEBUG - Show Secret Status
+        env:
+          PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "=== SECRET DEBUG INFO ==="
+          echo "KEYSTORE_PASSWORD length: ${#PASS}"
+          echo "KEY_ALIAS length: ${#ALIAS}"
+          echo "KEY_PASSWORD length: ${#KEY_PASS}"
+          echo "KEY_ALIAS value: '$ALIAS'"
+          echo "KEYSTORE_PASSWORD value: '$PASS'"
+          echo "KEY_PASSWORD value: '$KEY_PASS'"
+          echo "=========================="
+
+          # Fail if any secret is missing
+          [ -z "$PASS" ] && echo "KEYSTORE_PASSWORD is EMPTY!" && exit 1
+          [ -z "$ALIAS" ] && echo "KEY_ALIAS is EMPTY!" && exit 1
+          [ -z "$KEY_PASS" ] && echo "KEY_PASSWORD is EMPTY!" && exit 1
+
+      # VALIDATE KEYSTORE WITH FULL DEBUG
       - name: Validate Keystore & Credentials
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "Testing keystore with alias: $KEY_ALIAS"
-          keytool -list \
-            -keystore android/app/app/release.keystore \
+          KEYSTORE_PATH="android/app/app/release.keystore"
+          
+          echo "=== VALIDATING KEYSTORE ==="
+          echo "Path: $KEYSTORE_PATH"
+          [ ! -f "$KEYSTORE_PATH" ] && echo "FILE NOT FOUND!" && exit 1
+          echo "File size: $(stat -c%s "$KEYSTORE_PATH") bytes"
+          
+          echo "Testing with:"
+          echo "  Alias: '$KEY_ALIAS'"
+          echo "  Store Password: '$KEYSTORE_PASSWORD'"
+          echo "  Key Password: '$KEY_PASSWORD'"
+
+          # Run keytool and show output on failure
+          if keytool -list \
+            -keystore "$KEYSTORE_PATH" \
             -storepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" > /dev/null 2>&1 && echo "VALIDATED" || (echo "INVALID CREDENTIALS" && exit 1)
+            -alias "$KEY_ALIAS" > keytool_output.txt 2>&1; then
+            echo "VALIDATED: Keystore + credentials are correct"
+            rm keytool_output.txt
+          else
+            echo "VALIDATION FAILED"
+            echo "keytool output:"
+            cat keytool_output.txt
+            rm keytool_output.txt
+            exit 1
+          fi
 
-      - name: Clean Android Gradle cache
-        working-directory: android
-        run: ./gradlew clean
-
-      # Build and sign Release APK (using ABSOLUTE PATH to avoid daemon resolution bug)
+      # BUILD WITH ABSOLUTE PATH
       - name: Build Signed Release APK
         working-directory: android
         env:
@@ -86,49 +118,39 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "Building signed release APK..."
-          echo "Using alias: $KEY_ALIAS"
-          echo "Password lengths: store=${#KEYSTORE_PASSWORD}, key=${#KEY_PASSWORD}"
-
-          ABSOLUTE_KEYSTORE_PATH="${{ github.workspace }}/android/app/app/release.keystore"
-          echo "Absolute keystore path: $ABSOLUTE_KEYSTORE_PATH"
-          ls -la "$ABSOLUTE_KEYSTORE_PATH" || (echo "Keystore not found at absolute path!" && exit 1)
+          ABS_PATH="${{ github.workspace }}/android/app/app/release.keystore"
+          echo "Using absolute keystore path: $ABS_PATH"
+          [ ! -f "$ABS_PATH" ] && echo "Keystore missing at absolute path!" && exit 1
 
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="$ABSOLUTE_KEYSTORE_PATH" \
+            -Pandroid.injected.signing.store.file="$ABS_PATH" \
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+            --stacktrace
 
-      # Verify that APK exists
-      - name: Verify APK existence
+      # VERIFY APK
+      - name: Verify APK
         run: |
-          echo "Checking for signed APK..."
-          ls -l android/app/build/outputs/apk/release/
-          if [ ! -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            echo "APK not found!"
-            exit 1
-          fi
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          [ -f "$APK" ] && echo "APK BUILT: $APK" && ls -lh "$APK" || (echo "APK NOT FOUND!" && exit 1)
 
-      # Upload signed APK as build artifact
-      - name: Upload Signed APK artifact
+      # UPLOAD ARTIFACT
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AyshasFinanceApp-release
+          name: app-release-signed
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      # Upload to GitHub Releases
-      - name: Upload Signed APK to GitHub Release
+      # GITHUB RELEASE
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: "AyshasFinanceApp Release #${{ github.run_number }}"
+          name: "Release #${{ github.run_number }}"
           body: |
-            Automated signed release build
-            - Built with Vite + Capacitor
-            - Commit: ${{ github.sha }}
-            - Triggered by: ${{ github.actor }}
-          files: |
-            android/app/build/outputs/apk/release/app-release.apk
+            Signed APK built successfully
+            Commit: ${{ github.sha }}
+          files: android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
