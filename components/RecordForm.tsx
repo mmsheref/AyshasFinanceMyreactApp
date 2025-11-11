@@ -205,7 +205,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
           const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
           const isOpen = openCategory === category.name;
           return (
-            <div key={category.id} ref={el => categoryRefs.current[category.name] = el} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden transition-all duration-300">
+            <div key={category.id} ref={el => { if (el) categoryRefs.current[category.name] = el }} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden transition-all duration-300">
               <button
                 type="button"
                 onClick={() => toggleCategory(category.name)}
@@ -264,7 +264,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
       </div>
       
       {/* Sticky Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-20 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-40 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 py-3">
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                 <div>
