@@ -1,8 +1,9 @@
-name: Build Signed Release APK
+name: Build & Release Signed APK
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:  # allows manual trigger too
 
 permissions:
   contents: write
@@ -32,16 +33,13 @@ jobs:
           rm -rf android/app/src/main/assets/public
           rm -rf dist
 
-      # 5. Build React app for production
+      # 5. Build React app
       - name: Build React app
-        run: |
-          npm run build
-          ls -R dist
+        run: npm run build
 
       # 6. Sync web assets to Android
       - name: Sync to Android
-        run: |
-          npx cap sync android
+        run: npx cap sync android
 
       # 7. Set up Java for Gradle
       - name: Set up Java
@@ -50,7 +48,7 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 8. Decode and place the release keystore
+      # 8. Decode & Place Keystore
       - name: Decode & Place Keystore
         run: |
           mkdir -p android/app
@@ -59,19 +57,15 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # 9. [IMPROVED] Validate Keystore & Credentials
-      - name: Validate Keystore & Credentials
+      # 9. Validate Keystore
+      - name: Validate Keystore
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "Checking keystore integrity..."
-          keytool -list -v -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD"
-          
-          echo "Checking for alias..."
           keytool -list -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS"
 
-      # 10. Build the signed release APK
+      # 10. Build Signed Release APK
       - name: Build Signed Release APK
         working-directory: android
         env:
@@ -80,7 +74,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           ABS_PATH="${{ github.workspace }}/android/app/release.keystore"
-          echo "Keystore path: $ABS_PATH"
           ./gradlew clean --no-daemon
           ./gradlew assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$ABS_PATH" \
@@ -89,10 +82,21 @@ jobs:
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
             --stacktrace
 
-      # 11. Upload the release APK as an artifact
-      - name: Upload APK
+      # 11. Upload artifact to GitHub Actions (optional)
+      - name: Upload APK to Workflow
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: android/app/build/outputs/apk/release/app-release.apk
 
+      # 12. Create a GitHub Release and upload the APK
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Release v${{ github.run_number }}"
+          files: android/app/build/outputs/apk/release/app-release.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
