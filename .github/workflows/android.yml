@@ -50,27 +50,27 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # Decode and prepare keystore (correct path: android/app/release.keystore)
-      - name: Decode Keystore
+      # Place keystore exactly where Gradle expects it: android/app/app/release.keystore
+      - name: Decode Keystore (to expected Gradle path)
         run: |
-          mkdir -p android/app
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
-          chmod 600 android/app/release.keystore
-          echo "Keystore decoded to android/app/release.keystore"
+          echo "Creating android/app/app directory..."
+          mkdir -p android/app/app
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/app/release.keystore
+          chmod 600 android/app/app/release.keystore
+          echo "Keystore placed at android/app/app/release.keystore"
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # Debug: Verify keystore exists before build
-      - name: Verify Keystore File
+      # Verify keystore is in the correct location before build
+      - name: Verify Keystore Location
         working-directory: android
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Contents of app/ folder:"
-          ls -la app/ | grep release.keystore || true
-          if [ -f app/release.keystore ]; then
-            echo "Keystore ready at app/release.keystore"
+          echo "Expected path: app/app/release.keystore"
+          if [ -f app/app/release.keystore ]; then
+            echo "Keystore FOUND and ready"
+            ls -la app/app/release.keystore
           else
-            echo "ERROR: Keystore NOT found at app/release.keystore"
+            echo "ERROR: Keystore NOT found at app/app/release.keystore"
             exit 1
           fi
 
@@ -78,7 +78,7 @@ jobs:
         working-directory: android
         run: ./gradlew clean
 
-      # Build and sign Release APK (correct relative path: app/release.keystore)
+      # Build and sign Release APK using relative path (now matches actual file location)
       - name: Build Signed Release APK
         working-directory: android
         run: |
@@ -121,4 +121,3 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
