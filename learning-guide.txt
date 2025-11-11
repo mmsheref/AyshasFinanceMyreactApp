@@ -1,0 +1,77 @@
+
+# Web Development Learning Guide: From Kotlin/Android to a React P&L App
+
+Welcome! This guide is designed for someone with a background in Kotlin and Android Studio who wants to learn web development by building this specific Profit & Loss application. We'll go from the absolute fundamentals to the exact technologies used in this project.
+
+The key is to learn one step at a time and build a small project at each stage to solidify your understanding.
+
+---
+### **Step 1: The Core Trio - HTML, CSS, & JavaScript**
+---
+These are the absolute foundations of any website. You cannot skip them.
+
+*   **HTML (HyperText Markup Language):** The skeleton of a webpage. It defines the structure and content.
+    *   **What to Learn:** Basic tags (`<div>`, `<p>`, `<h1>`, `<button>`, `<input>`), attributes (`class`, `id`, `src`), how to create forms.
+    *   **Analogy:** This is like defining the layout in your XML or the structure of your Composables.
+    *   **Goal:** Be able to create the structure of the "New Record" form using only HTML.
+    *   **Recommended Resource:** MDN Web Docs - Introduction to HTML.
+
+*   **CSS (Cascading Style Sheets):** The styling. It controls the colors, fonts, layout, and appearance.
+    *   **What to Learn:** Selectors (how to target HTML elements), properties (`color`, `font-size`, `margin`), and most importantly, **Flexbox** and **Grid** for creating layouts. Also, learn about responsive design with media queries to make your app look good on both mobile and desktop.
+    *   **Analogy:** This is your styling and theming, like using Modifiers in Jetpack Compose.
+    *   **Goal:** Style the HTML form you created to look clean and be responsive.
+    *   **Recommended Resource:** MDN Web Docs - Introduction to CSS, "A Complete Guide to Flexbox" on CSS-Tricks.
+
+*   **JavaScript (JS):** The interactivity and logic. This is the programming language of the web.
+    *   **What to Learn:** Variables (`let`, `const`), data types, functions, `if/else`, loops, and how to manipulate the HTML/CSS (this is called DOM Manipulation).
+    *   **Analogy:** This is your Kotlin code, where you handle button clicks and business logic.
+    *   **Goal:** Make your form functional. When you type numbers and click a "Calculate" button, use JS to calculate the profit and display it on the page.
+
+**Project for this Step:** Build a single-page, non-saving P&L calculator using only these three technologies. This is a crucial foundation.
+
+---
+### **Step 2: Modern JavaScript (ES6+ Features)**
+---
+JavaScript has evolved a lot. Modern web development relies heavily on newer features.
+
+*   **What to Learn:**
+    *   `import` / `export`: For organizing your code into multiple files (modules).
+    *   Arrow Functions (`=>`): A shorter syntax for functions.
+    *   `Array.map()`: Incredibly important for transforming data into UI elements. This is a concept you'll use constantly in React.
+    *   `async`/`await`: For handling operations that take time (like fetching data from a server, though we don't do that here, it's a core concept).
+
+*   **Goal:** Understand the syntax you see in the provided `.tsx` files. Refactor the JavaScript from your Step 1 project to use these modern features.
+
+---
+### **Step 3: Your UI Framework - React**
+---
+React is a JavaScript library for building user interfaces. It lets you create complex apps by breaking them into small, reusable pieces called "components".
+
+*   **Analogy:** This is the Jetpack Compose of the web world. A React "Component" is very similar to a "Composable" function.
+*   **What to Learn:**
+    *   **JSX:** A syntax extension that lets you write HTML-like code directly in your JavaScript.
+    *   **Components:** How to create functional components (e.g., `Dashboard`, `RecordForm`).
+    *   **State (`useState`):** How components "remember" data. This is the direct equivalent of `remember { mutableStateOf(...) }` in Compose.
+    *   **Props:** How you pass data from a parent component to a child component.
+    *   **Event Handling:** (`onClick`, `onChange`) How you respond to user input.
+    *   **useEffect:** How to perform "side effects", like loading/saving data when the app starts or state changes. This is similar to `LaunchedEffect` in Compose.
+
+*   **Recommended Resource:** The new official React documentation at **react.dev** is the best place to start. It has an excellent, interactive tutorial.
+*   **Project for this Step:** Rebuild your P&L calculator from scratch, but this time using React.
+
+---
+### **Step 4: Adding Types - TypeScript**
+---
+TypeScript is a superset of JavaScript that adds static types. Since you're coming from Kotlin, you will appreciate this immediately. It helps prevent bugs and improves code quality. The existing project uses it (files ending in `.ts` and `.tsx`).
+
+*   **What to Learn:** Basic types (`string`, `number`), creating custom types with `interface` (e.g., `interface DailyRecord`), and how to use these types for your props and state in React.
+*   **Goal:** Create the `types.ts` file from the project and use those types within your React components.
+
+---
+### **Step 5: A Modern Way to Style - Tailwind CSS**
+---
+Tailwind CSS is a "utility-first" CSS framework. Instead of writing separate CSS files, you apply pre-made classes directly in your HTML/JSX. This is what the project uses (`className="bg-white p-4..."`).
+
+*   **Analogy:** This is somewhat like applying a series of simple Modifiers in Compose (`.padding()`, `.background()`, `.fillMaxWidth()`).
+*   **What to Learn:** The basic syntax and how to use the official Tailwind CSS documentation to find the classes you need.
+*   **Goal:** Restyle your React app from Step 3 to use Tailwind CSS. Try to replicate the look of one

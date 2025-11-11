@@ -1,4 +1,3 @@
-
 import React, { ReactNode } from 'react';
 
 interface ModalProps {
@@ -9,11 +8,11 @@ interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ children, onClose }) => {
   return (
     <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4"
+        className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex justify-center items-center p-4"
         onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg"
+        className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg"
         onClick={e => e.stopPropagation()}
       >
         {children}

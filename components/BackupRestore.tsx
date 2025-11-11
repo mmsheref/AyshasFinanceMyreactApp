@@ -12,7 +12,15 @@ interface BackupRestoreProps {
 }
 
 const isExpenseItem = (obj: any): obj is ExpenseItem => {
-    return obj && typeof obj.id === 'string' && typeof obj.name === 'string' && typeof obj.amount === 'number' && (typeof obj.billPhoto === 'string' || typeof obj.billPhoto === 'undefined');
+    if (!obj || typeof obj.id !== 'string' || typeof obj.name !== 'string' || typeof obj.amount !== 'number') {
+        return false;
+    }
+    // For backward compatibility with old backups (billPhoto: string)
+    const hasOldPhoto = typeof obj.billPhoto === 'string' || typeof obj.billPhoto === 'undefined';
+    // For new format (billPhotos: string[])
+    const hasNewPhotos = typeof obj.billPhotos === 'undefined' || (Array.isArray(obj.billPhotos) && obj.billPhotos.every(p => typeof p === 'string'));
+    
+    return hasOldPhoto && hasNewPhotos;
 };
 
 const isExpenseCategory = (obj: any): obj is ExpenseCategory => {
@@ -130,7 +138,7 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
     setRecordsToImport(null);
   }
 
-  const buttonClass = "flex items-center justify-center px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md transition-colors w-full sm:w-auto";
+  const buttonClass = "flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors w-full sm:w-auto";
 
   return (
     <>
@@ -161,7 +169,7 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
       </div>
       {showModal && recordsToImport && (
         <Modal onClose={cancelRestore}>
-            <div className="p-4 text-center bg-white dark:bg-slate-800 rounded-lg">
+            <div className="p-4 text-center bg-white dark:bg-slate-900 rounded-lg">
                 <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Confirm Import</h3>
                 <p className="text-gray-600 dark:text-slate-300 mb-2">You are about to import <span className="font-bold">{recordsToImport.records.length}</span> records.</p>
                  {Object.keys(recordsToImport.customStructure).length > 0 && (

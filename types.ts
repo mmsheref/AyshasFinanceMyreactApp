@@ -2,7 +2,7 @@ export interface ExpenseItem {
   id: string;
   name: string;
   amount: number;
-  billPhoto?: string; // base64 encoded image string
+  billPhotos?: string[]; // base64 encoded image strings
 }
 
 export interface ExpenseCategory {

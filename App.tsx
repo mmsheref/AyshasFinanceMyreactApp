@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { DailyRecord, CustomExpenseStructure, BackupData } from './types';
+import { DailyRecord, CustomExpenseStructure, BackupData, ExpenseCategory } from './types';
 import Dashboard from './components/Dashboard';
 import RecordList from './components/RecordList';
 import RecordForm from './components/RecordForm';
 import RecordDetail from './components/RecordDetail';
 import { PlusIcon, HomeIcon, ListIcon, BackIcon, SettingsIcon } from './components/Icons';
 import { DEFAULT_EXPENSE_STRUCTURE } from './constants';
-import Modal from './components/Modal';
-import BackupRestore from './components/BackupRestore';
+import SettingsPage from './components/SettingsPage';
 
-type View = 'dashboard' | 'records' | 'form' | 'detail';
+type View = 'dashboard' | 'records' | 'form' | 'detail' | 'settings';
 
 const App: React.FC = () => {
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [customStructure, setCustomStructure] = useState<CustomExpenseStructure>({});
   const [view, setView] = useState<View>('dashboard');
+  const [lastView, setLastView] = useState<View>('dashboard');
   const [currentRecord, setCurrentRecord] = useState<DailyRecord | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Effect to handle system dark mode changes
   useEffect(() => {
@@ -38,11 +37,37 @@ const App: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
+  const runMigration = (recordsToMigrate: DailyRecord[]): { migratedRecords: DailyRecord[], needsUpdate: boolean } => {
+    let needsUpdate = false;
+    const migratedRecords = JSON.parse(JSON.stringify(recordsToMigrate)); // Deep copy
+
+    migratedRecords.forEach((rec: DailyRecord) => {
+        rec.expenses.forEach((cat: ExpenseCategory) => {
+            // This `any` is for safely checking old property `billPhoto`
+            cat.items.forEach((item: any) => {
+                if (item.billPhoto && (!item.billPhotos || item.billPhotos.length === 0)) {
+                    item.billPhotos = [item.billPhoto];
+                    delete item.billPhoto;
+                    needsUpdate = true;
+                }
+            });
+        });
+    });
+    return { migratedRecords, needsUpdate };
+  };
+
   useEffect(() => {
     try {
       const storedRecords = localStorage.getItem('ayshas-records');
       if (storedRecords) {
-        setRecords(JSON.parse(storedRecords));
+        const parsedRecords: DailyRecord[] = JSON.parse(storedRecords);
+        const { migratedRecords, needsUpdate } = runMigration(parsedRecords);
+        setRecords(migratedRecords);
+
+        if (needsUpdate) {
+            console.log("Migrating records to new billPhotos format.");
+            localStorage.setItem('ayshas-records', JSON.stringify(migratedRecords));
+        }
       }
       
       const storedStructure = localStorage.getItem('ayshas-custom-structure');
@@ -79,6 +104,9 @@ const App: React.FC = () => {
   const sortedRecords = records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const navigate = (newView: View, record: DailyRecord | null = null) => {
+    if (newView !== view && view !== 'form' && view !== 'detail') {
+        setLastView(view);
+    }
     setCurrentRecord(record);
     setView(newView);
     window.scrollTo(0, 0); // Scroll to top on view change
@@ -112,10 +140,10 @@ const App: React.FC = () => {
   };
   
   const handleRestore = (data: BackupData) => {
-    setRecords(data.records);
+    const { migratedRecords } = runMigration(data.records);
+    setRecords(migratedRecords);
     setCustomStructure(data.customStructure);
     alert(`Successfully restored ${data.records.length} records.`);
-    setIsSettingsOpen(false);
     navigate('dashboard');
   };
 
@@ -125,7 +153,7 @@ const App: React.FC = () => {
         return <RecordForm 
                   record={currentRecord} 
                   onSave={handleSave} 
-                  onCancel={() => navigate(currentRecord ? 'detail' : 'dashboard', currentRecord)} 
+                  onCancel={() => navigate(currentRecord ? 'detail' : lastView, currentRecord)} 
                   allRecords={sortedRecords} 
                   customStructure={customStructure}
                   onSaveCustomItem={handleSaveCustomItem}
@@ -134,6 +162,8 @@ const App: React.FC = () => {
         return currentRecord && <RecordDetail record={currentRecord} onDelete={handleDelete} onEdit={(r) => navigate('form', r)} />;
       case 'records':
         return <RecordList records={sortedRecords} onView={(r) => navigate('detail', r)} />;
+      case 'settings':
+        return <SettingsPage allRecords={records} customStructure={customStructure} onRestore={handleRestore} />;
       case 'dashboard':
       default:
         return <Dashboard records={sortedRecords} onViewRecord={(r) => navigate('detail', r)} />;
@@ -146,14 +176,17 @@ const App: React.FC = () => {
       case 'records': return 'All Records';
       case 'form': return currentRecord ? 'Edit Record' : 'New Record';
       case 'detail': return 'Record Details';
+      case 'settings': return 'Settings';
       default: return "Aysha's P&L";
     }
   };
 
-  const showBackButton = ['form', 'detail'].includes(view);
+  const showBackButton = ['form', 'detail', 'settings'].includes(view);
   const handleBack = () => {
     if (view === 'detail') navigate('records');
     else if (view === 'form' && currentRecord) navigate('detail', currentRecord);
+    else if (view === 'form' && !currentRecord) navigate(lastView);
+    else if (view === 'settings') navigate(lastView);
     else navigate('dashboard');
   };
 
@@ -162,72 +195,55 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="bg-primary text-white sticky top-0 z-20 pt-[env(safe-area-inset-top)] dark:border-b dark:border-slate-800">
         <div className="container mx-auto px-4 h-16 flex justify-between items-center">
-          <div className="flex items-center">
+          <div className="flex items-center w-1/3">
             {showBackButton ? (
               <button onClick={handleBack} className="p-2 -ml-2 mr-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Go back">
                 <BackIcon className="w-6 h-6" />
               </button>
-            ) : <div className="w-10"></div>}
+            ) : null}
           </div>
-          <h1 className="text-xl font-bold tracking-tight absolute left-1/2 -translate-x-1/2">
+          <h1 className="text-xl font-bold tracking-tight text-center w-1/3 truncate">
             {getHeaderText()}
           </h1>
-          <div className="flex items-center">
-            <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Settings">
-                <SettingsIcon className="w-6 h-6" />
-            </button>
+          <div className="flex items-center justify-end w-1/3">
+            {/* Placeholder for potential future icons */}
           </div>
         </div>
       </header>
       
       {/* Main Content */}
-      <main className="container mx-auto p-4 flex-grow pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      <main className="container mx-auto p-4 flex-grow pb-[calc(5rem+env(safe-area-inset-bottom))]">
         {renderView()}
       </main>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 h-24 bg-transparent z-30 pointer-events-none pb-[env(safe-area-inset-bottom)]">
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-800 dark:border-t dark:border-slate-700 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] dark:shadow-none pointer-events-auto">
-          <div className="flex justify-around items-center h-full">
-            <button onClick={() => navigate('dashboard')} className={`flex flex-col items-center justify-center w-full transition-colors ${view === 'dashboard' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Dashboard">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-30 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
+        <div className="container mx-auto h-16 grid grid-cols-3 items-center">
+            <button onClick={() => navigate('dashboard')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'dashboard' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Dashboard">
               <HomeIcon className="w-6 h-6 mb-1" />
               <span className="text-xs font-medium">Dashboard</span>
             </button>
-            <div className="w-20"></div> {/* Spacer for FAB */}
-            <button onClick={() => navigate('records')} className={`flex flex-col items-center justify-center w-full transition-colors ${view === 'records' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Records">
+            <button onClick={() => navigate('records')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'records' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Records">
               <ListIcon className="w-6 h-6 mb-1" />
               <span className="text-xs font-medium">Records</span>
             </button>
-          </div>
+            <button onClick={() => navigate('settings')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'settings' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Settings">
+              <SettingsIcon className="w-6 h-6 mb-1" />
+              <span className="text-xs font-medium">Settings</span>
+            </button>
         </div>
-        {view !== 'form' && (
+      </nav>
+
+       {['dashboard', 'records'].includes(view) && (
+        <div className="fixed bottom-[calc(5rem)] left-1/2 -translate-x-1/2 z-40 pb-[env(safe-area-inset-bottom)]">
             <button
               onClick={() => navigate('form')}
-              className="absolute left-1/2 -translate-x-1/2 top-0 w-16 h-16 bg-secondary hover:bg-primary text-white rounded-full p-4 shadow-lg transition-transform duration-200 ease-in-out hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary pointer-events-auto"
+              className="w-16 h-16 bg-secondary hover:bg-primary text-white rounded-full p-4 shadow-lg transition-transform duration-200 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-secondary/30"
               aria-label="Add New Record"
             >
               <PlusIcon className="h-8 w-8" />
             </button>
-        )}
-      </div>
-
-      {isSettingsOpen && (
-        <Modal onClose={() => setIsSettingsOpen(false)}>
-            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg">
-                <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Settings</h3>
-                <div className="space-y-4">
-                    <div>
-                        <h4 className="text-lg font-semibold mb-2 text-slate-700 dark:text-slate-200">Data Management</h4>
-                        <p className="text-slate-600 dark:text-slate-400 mb-3">Backup your data to a file or restore from a previous backup.</p>
-                        <BackupRestore 
-                            onRestore={handleRestore} 
-                            allRecords={records} 
-                            customStructure={customStructure} 
-                        />
-                    </div>
-                </div>
-            </div>
-        </Modal>
+        </div>
       )}
     </div>
   );

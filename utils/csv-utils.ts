@@ -68,7 +68,7 @@ export const convertToCSV = (records: DailyRecord[]): string => {
                         category.name,
                         item.name,
                         item.amount,
-                        item.billPhoto ? 'Yes' : 'No'
+                        (item.billPhotos && item.billPhotos.length > 0) ? 'Yes' : 'No'
                     ].map(escapeCsvField);
                     csvRows.push(row.join(','));
                 });

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { DailyRecord, ExpenseCategory, CustomExpenseStructure } from '../types';
 import { generateNewRecordExpenses, FALLBACK_ITEM_COSTS } from '../constants';
 import ImageUpload from './ImageUpload';
 import Modal from './Modal';
-import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
+import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon } from './Icons';
 
 interface RecordFormProps {
   record: DailyRecord | null;
@@ -51,7 +51,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
   const [dateError, setDateError] = useState('');
   const [isAddItemModalOpen, setAddItemModalOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', categoryIndex: 0, saveForFuture: false });
-  const [openCategory, setOpenCategory] = useState<string | null>(formData.expenses[0]?.name || null);
+  const [openCategory, setOpenCategory] = useState<string | null>(() => {
+    return localStorage.getItem('ayshas-last-open-category') || formData.expenses[0]?.name || null;
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{catIndex: number, itemIndex: number, itemName: string} | null>(null);
+  const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
 
   useEffect(() => {
     if (!record) {
@@ -67,14 +71,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
   const totalExpenses = useMemo(() => formData.expenses.reduce((total, category) => 
     total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 0), [formData.expenses]);
   
-  const profit = useMemo(() => formData.totalSales - totalExpenses, [formData.totalSales, totalExpenses]);
+  const profit = useMemo(() => (formData.totalSales || 0) - totalExpenses, [formData.totalSales, totalExpenses]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (name === 'date') {
         setFormData({ ...formData, date: value, id: value });
     } else {
-        setFormData({ ...formData, [name]: Number(value) || 0 });
+        const parsedValue = parseFloat(value);
+        setFormData({ ...formData, [name]: isNaN(parsedValue) ? 0 : parsedValue });
     }
   };
 
@@ -84,9 +89,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
     setFormData({ ...formData, expenses: newExpenses });
   };
   
-  const handlePhotoChange = (catIndex: number, itemIndex: number, base64: string | undefined) => {
+  const handlePhotosChange = (catIndex: number, itemIndex: number, photos: string[]) => {
     const newExpenses = [...formData.expenses];
-    newExpenses[catIndex].items[itemIndex].billPhoto = base64;
+    newExpenses[catIndex].items[itemIndex].billPhotos = photos;
     setFormData({ ...formData, expenses: newExpenses });
   };
   
@@ -108,7 +113,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
         return;
     }
 
-    category.items.push({ id: uuidv4(), name: newItem.name.trim(), amount: 0 });
+    category.items.push({ id: uuidv4(), name: newItem.name.trim(), amount: 0, billPhotos: [] });
     setFormData({ ...formData, expenses: newExpenses });
 
     if (newItem.saveForFuture) {
@@ -117,27 +122,50 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
     setAddItemModalOpen(false);
   };
 
-  const removeExpenseItem = (catIndex: number, itemIndex: number) => {
-    if (confirm("Are you sure you want to delete this item?")) {
+  const confirmRemoveExpenseItem = () => {
+    if (deleteConfirmation) {
+        const { catIndex, itemIndex } = deleteConfirmation;
         const newExpenses = [...formData.expenses];
         newExpenses[catIndex].items.splice(itemIndex, 1);
         setFormData({ ...formData, expenses: newExpenses });
+        setDeleteConfirmation(null);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.date) {
+      alert('Please select a date.');
+      return;
+    }
+    if (dateError && !record) {
+      alert(dateError);
+      return;
+    }
     onSave(formData);
   };
 
   const toggleCategory = (categoryName: string) => {
-    setOpenCategory(openCategory === categoryName ? null : categoryName);
+    const isOpening = openCategory !== categoryName;
+    const newOpenCategory = isOpening ? categoryName : null;
+    setOpenCategory(newOpenCategory);
+
+    if (newOpenCategory) {
+        localStorage.setItem('ayshas-last-open-category', newOpenCategory);
+        setTimeout(() => {
+            categoryRefs.current[categoryName]?.scrollIntoView({ behavior: 'smooth' });
+        }, 100); // Delay to allow accordion to open
+    } else {
+        localStorage.removeItem('ayshas-last-open-category');
+    }
   };
+
+  const inputStyles = "w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pb-24">
       {/* Date and Sales */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date</label>
@@ -147,8 +175,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
               name="date"
               value={formData.date}
               onChange={handleInputChange}
-              required
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+              className={inputStyles}
             />
           </div>
           <div>
@@ -156,14 +183,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 id="totalSales"
                 name="totalSales"
                 value={formData.totalSales === 0 ? '' : formData.totalSales}
                 onChange={handleInputChange}
-                required
-                className="w-full pl-7 px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
-                placeholder="0"
+                className={`${inputStyles} pl-7`}
+                placeholder="Can be added later"
               />
             </div>
           </div>
@@ -178,7 +205,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
           const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
           const isOpen = openCategory === category.name;
           return (
-            <div key={category.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
+            <div key={category.id} ref={el => categoryRefs.current[category.name] = el} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden transition-all duration-300">
               <button
                 type="button"
                 onClick={() => toggleCategory(category.name)}
@@ -189,34 +216,38 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                   <h4 className="text-lg font-semibold text-primary">{category.name}</h4>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Total: ₹{categoryTotal.toLocaleString('en-IN')}</p>
                 </div>
-                {isOpen ? <ChevronUpIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /> : <ChevronDownIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />}
+                <div className={`transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                    <ChevronDownIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />
+                </div>
               </button>
               {isOpen && (
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800">
                   <div className="space-y-4">
                     {category.items.map((item, itemIndex) => (
                       <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3">
                         <label htmlFor={`${category.id}-${item.id}`} className="text-slate-700 dark:text-slate-300 font-medium pr-2 truncate">{item.name}</label>
-                        <button type="button" onClick={() => removeExpenseItem(catIndex, itemIndex)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20" aria-label={`Remove ${item.name}`}>
+                        <button type="button" onClick={() => setDeleteConfirmation({catIndex, itemIndex, itemName: item.name})} className="text-slate-400 hover:text-error p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20" aria-label={`Remove ${item.name}`}>
                           <TrashIcon className="w-5 h-5"/>
                         </button>
-                        <div className="flex items-center gap-2 col-span-2">
-                          <div className="relative flex-grow">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              id={`${category.id}-${item.id}`}
-                              value={item.amount === 0 ? '' : item.amount}
-                              onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)}
-                              className="w-full pl-7 pr-2 py-1.5 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
-                              placeholder="0"
-                            />
-                          </div>
-                          <ImageUpload 
-                            billPhoto={item.billPhoto}
-                            onPhotoChange={(base64) => handlePhotoChange(catIndex, itemIndex, base64)} 
-                          />
+                        <div className="col-span-2">
+                            <div className="relative">
+                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
+                                <input
+                                type="number"
+                                step="0.01"
+                                id={`${category.id}-${item.id}`}
+                                value={item.amount === 0 ? '' : item.amount}
+                                onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)}
+                                className={`${inputStyles} pl-7 pr-2 py-1.5`}
+                                placeholder="0"
+                                />
+                            </div>
+                            {category.name === 'Market Bills' && (
+                              <ImageUpload 
+                                  billPhotos={item.billPhotos}
+                                  onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} 
+                              />
+                            )}
                         </div>
                       </div>
                     ))}
@@ -233,12 +264,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
       </div>
       
       {/* Sticky Footer */}
-      <div className="fixed left-0 right-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm shadow-[0_-2px_10px_rgba(0,0,0,0.05)] dark:border-t dark:border-slate-700 z-20 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-20 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 py-3">
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                 <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Sales</p>
-                    <p className="font-bold text-primary truncate">₹{formData.totalSales.toLocaleString('en-IN')}</p>
+                    <p className="font-bold text-primary truncate">₹{(formData.totalSales || 0).toLocaleString('en-IN')}</p>
                 </div>
                 <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Expenses</p>
@@ -250,15 +281,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                 </div>
             </div>
           <div className="flex justify-end items-center space-x-3">
-            <button type="button" onClick={onCancel} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">Cancel</button>
-            <button type="submit" className="px-5 py-2.5 bg-secondary text-white rounded-md text-sm font-semibold hover:bg-primary shadow-sm">Save Record</button>
+            <button type="button" onClick={onCancel} className="px-5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+            <button type="submit" className="px-5 py-2.5 bg-secondary text-white rounded-lg text-sm font-semibold hover:bg-primary shadow-sm transition-colors">Save Record</button>
           </div>
         </div>
       </div>
       
       {isAddItemModalOpen && (
         <Modal onClose={() => setAddItemModalOpen(false)}>
-            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg">
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-xl">
                 <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Add New Expense Item</h3>
                 <div className="space-y-4">
                     <div>
@@ -268,7 +299,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                             id="newItemName"
                             value={newItem.name}
                             onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                            className={inputStyles}
                             placeholder="e.g., New Supplier"
                         />
                     </div>
@@ -284,8 +315,26 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end space-x-3">
-                    <button type="button" onClick={() => setAddItemModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">Cancel</button>
-                    <button type="button" onClick={handleAddNewItem} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-primary">Add Item</button>
+                    <button type="button" onClick={() => setAddItemModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button>
+                    <button type="button" onClick={handleAddNewItem} className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary">Add Item</button>
+                </div>
+            </div>
+        </Modal>
+      )}
+
+      {deleteConfirmation && (
+        <Modal onClose={() => setDeleteConfirmation(null)}>
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-xl text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30">
+                    <WarningIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className="text-xl font-bold mt-4 mb-2 dark:text-slate-100">Confirm Deletion</h3>
+                <p className="text-slate-600 dark:text-slate-300 mb-6">
+                    Are you sure you want to permanently delete the item: <br/> <span className="font-semibold text-slate-800 dark:text-slate-100">{deleteConfirmation.itemName}</span>?
+                </p>
+                <div className="flex justify-center space-x-4">
+                    <button type="button" onClick={() => setDeleteConfirmation(null)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                    <button type="button" onClick={confirmRemoveExpenseItem} className="px-5 py-2.5 bg-error text-white rounded-lg text-sm font-semibold hover:bg-red-700 shadow-sm transition-colors">Delete Item</button>
                 </div>
             </div>
         </Modal>

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { DailyRecord } from '../types';
+import { DailyRecord, ExpenseCategory } from '../types';
 
 interface ShareableReportProps {
   record: DailyRecord;
@@ -13,56 +13,78 @@ const calculateTotalExpenses = (record: DailyRecord) => {
     0);
 };
 
+const CategoryCard: React.FC<{ category: ExpenseCategory }> = ({ category }) => {
+    const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
+    const itemsWithAmount = category.items.filter(item => item.amount > 0);
+
+    return (
+        <div>
+            <h4 className="text-md font-semibold text-slate-700 bg-slate-100 p-2 rounded-t-md flex justify-between">
+                <span>{category.name}</span>
+                <span>₹{categoryTotal.toLocaleString('en-IN')}</span>
+            </h4>
+            <ul className="border border-t-0 border-slate-200 rounded-b-md">
+                {itemsWithAmount.map((item, index) => (
+                    <li key={item.id} className={`px-2 py-1 flex justify-between items-center text-sm ${index < itemsWithAmount.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                        <span className="text-slate-700 truncate pr-2">{item.name}</span>
+                        <span className="font-medium text-slate-800 flex-shrink-0">₹{item.amount.toLocaleString('en-IN')}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
 const ShareableReport: React.FC<ShareableReportProps> = ({ record, id }) => {
   const totalExpenses = calculateTotalExpenses(record);
   const profit = record.totalSales - totalExpenses;
+  
+  const categoriesWithExpenses = record.expenses.filter(category => 
+    category.items.reduce((sum, item) => sum + item.amount, 0) > 0
+  );
+
+  const middleIndex = Math.ceil(categoriesWithExpenses.length / 2);
+  const leftColumnCategories = categoriesWithExpenses.slice(0, middleIndex);
+  const rightColumnCategories = categoriesWithExpenses.slice(middleIndex);
 
   return (
-    <div id={id} className="p-6 bg-white font-sans" style={{ width: '450px', color: '#1e293b' }}>
-      <div className="text-center pb-4 mb-4">
-        <h1 className="text-2xl font-bold text-primary">Aysha's P&L Report</h1>
-        <p className="text-lg text-slate-600">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    <div id={id} className="p-8 bg-white font-sans" style={{ width: '800px', color: '#1e293b' }}>
+      <div className="text-center pb-4 mb-6 border-b border-slate-200">
+        <h1 className="text-3xl font-bold text-primary">Aysha's P&L Report</h1>
+        <p className="text-xl text-slate-600 mt-1">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 text-center mb-6">
-        <div className="bg-slate-50 p-3 rounded-lg">
-          <p className="text-sm font-medium text-slate-600">Total Sales</p>
-          <p className="text-2xl font-bold text-primary">₹{record.totalSales.toLocaleString('en-IN')}</p>
+      <div className="grid grid-cols-3 gap-4 text-center mb-8">
+        <div className="bg-slate-50 p-4 rounded-lg">
+          <p className="text-md font-medium text-slate-600">Total Sales</p>
+          <p className="text-3xl font-bold text-primary">₹{record.totalSales.toLocaleString('en-IN')}</p>
         </div>
-        <div className="bg-slate-50 p-3 rounded-lg">
-          <p className="text-sm font-medium text-slate-600">Total Expenses</p>
-          <p className="text-2xl font-bold text-error">₹{totalExpenses.toLocaleString('en-IN')}</p>
+        <div className="bg-slate-50 p-4 rounded-lg">
+          <p className="text-md font-medium text-slate-600">Total Expenses</p>
+          <p className="text-3xl font-bold text-error">₹{totalExpenses.toLocaleString('en-IN')}</p>
         </div>
-        <div className="bg-slate-50 p-3 rounded-lg">
-          <p className="text-sm font-medium text-slate-600">{profit >= 0 ? 'Profit' : 'Loss'}</p>
-          <p className={`text-2xl font-bold ${profit >= 0 ? 'text-success' : 'text-error'}`}>₹{Math.abs(profit).toLocaleString('en-IN')}</p>
+        <div className="bg-slate-50 p-4 rounded-lg">
+          <p className="text-md font-medium text-slate-600">{profit >= 0 ? 'Profit' : 'Loss'}</p>
+          <p className={`text-3xl font-bold ${profit >= 0 ? 'text-success' : 'text-error'}`}>₹{Math.abs(profit).toLocaleString('en-IN')}</p>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-slate-800 text-center mb-2">Expense Breakdown</h3>
-        {record.expenses.map(category => {
-          const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
-          if (categoryTotal === 0) return null;
-          return (
-            <div key={category.id}>
-              <h4 className="text-md font-semibold text-slate-700 bg-slate-100 p-2 rounded-t-md flex justify-between">
-                <span>{category.name}</span>
-                <span>₹{categoryTotal.toLocaleString('en-IN')}</span>
-              </h4>
-              <ul className="border border-t-0 border-slate-200 rounded-b-md">
-                {category.items.filter(item => item.amount > 0).map((item, index, arr) => (
-                  <li key={item.id} className={`px-2 py-1 flex justify-between items-center text-sm ${index < arr.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                    <span className="text-slate-700">{item.name}</span>
-                    <span className="font-medium text-slate-800">₹{item.amount.toLocaleString('en-IN')}</span>
-                  </li>
+      <div>
+        <h3 className="text-xl font-semibold text-slate-800 text-center mb-4">Expense Breakdown</h3>
+        <div className="grid grid-cols-2 gap-x-6 align-top">
+            <div className="space-y-4">
+                {leftColumnCategories.map(category => (
+                    <CategoryCard key={category.id} category={category} />
                 ))}
-              </ul>
             </div>
-          );
-        })}
+            <div className="space-y-4">
+                 {rightColumnCategories.map(category => (
+                    <CategoryCard key={category.id} category={category} />
+                ))}
+            </div>
+        </div>
       </div>
-       <div className="text-center mt-6 pt-4 border-t border-slate-200 text-xs text-slate-400">
+       <div className="text-center mt-8 pt-4 border-t border-slate-200 text-sm text-slate-400">
         <p>Generated by Aysha's P&L Dashboard</p>
       </div>
     </div>

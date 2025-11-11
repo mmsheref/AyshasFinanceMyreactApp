@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export const PlusIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -94,6 +93,18 @@ export const ChevronUpIcon: React.FC<{ className?: string }> = ({ className }) =
     </svg>
 );
 
+export const ChevronLeftIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+    </svg>
+);
+
+export const ChevronRightIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+    </svg>
+);
+
 export const HomeIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h7.5" />
@@ -109,5 +120,23 @@ export const ListIcon: React.FC<{ className?: string }> = ({ className }) => (
 export const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-1.007 1.11-1.226l.28-.1c.34-.12.7-.12 1.04 0l.28.1c.55.219 1.02.684 1.11 1.226l.09.542a2.25 2.25 0 0 1-1.11 2.477l-.28.1c-.34.12-.7.12-1.04 0l-.28-.1a2.25 2.25 0 0 1-1.11-2.477l-.09-.542Zm-2.39 14.122c.09-.542.56-1.007 1.11-1.226l.28-.1c.34-.12.7-.12 1.04 0l.28.1c.55.219 1.02.684 1.11 1.226l.09.542a2.25 2.25 0 0 1-1.11 2.477l-.28.1c-.34.12-.7.12-1.04 0l-.28-.1a2.25 2.25 0 0 1-1.11-2.477l-.09-.542Zm-4.28 0c.09-.542.56-1.007 1.11-1.226l.28-.1c.34-.12.7-.12 1.04 0l.28.1c.55.219 1.02.684 1.11 1.226l.09.542a2.25 2.25 0 0 1-1.11 2.477l-.28.1c-.34.12-.7.12-1.04 0l-.28-.1a2.25 2.25 0 0 1-1.11-2.477l-.09-.542Zm16.94-2.25c-.09.542-.56 1.007-1.11 1.226l-.28.1c-.34.12-.7.12-1.04 0l-.28-.1c-.55-.219-1.02-.684-1.11-1.226l-.09-.542a2.25 2.25 0 0 1 1.11-2.477l.28-.1c.34-.12.7-.12 1.04 0l.28.1c.55.219 1.02.684 1.11 1.226l.09.542Zm-12.83-2.25c.09-.542.56-1.007 1.11-1.226l.28-.1c.34-.12.7-.12 1.04 0l.28.1c.55.219 1.02.684 1.11 1.226l.09.542a2.25 2.25 0 0 1-1.11 2.477l-.28.1c-.34.12-.7.12-1.04 0l-.28-.1a2.25 2.25 0 0 1-1.11-2.477l-.09-.542Z" />
+    </svg>
+);
+
+export const WarningIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+    </svg>
+);
+
+export const CalendarIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0h18" />
+    </svg>
+);
+
+export const XMarkIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
     </svg>
 );

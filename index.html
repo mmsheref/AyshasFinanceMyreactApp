@@ -20,16 +20,20 @@
               sans: ['Inter', 'sans-serif'],
             },
             colors: {
-              primary: '#4f46e5',   // indigo-600
+              primary: {
+                DEFAULT: '#7c3aed', // violet-600
+                '50': '#f5f3ff', '100': '#ede9fe', '200': '#ddd6fe', '300': '#c4b5fd', '400': '#a78bfa', '500': '#8b5cf6', '600': '#7c3aed', '700': '#6d28d9', '800': '#5b21b6', '900': '#4c1d95', '950': '#3b0764'
+              },
               secondary: '#14b8a6',  // teal-500
               accent: '#f97316',    // orange-500
-              neutral: '#f1f5f9',   // slate-100
-              base: '#ffffff',
-              info: '#0ea5e9',      // sky-500
               success: '#10b981',   // emerald-500
+              error: '#ef4444',     // red-500
               warning: '#fcd34d',   // amber-400
-              error: '#f43f5e',     // rose-500
             },
+            borderRadius: {
+              'xl': '1rem',
+              '2xl': '1.5rem',
+            }
           }
         }
       }
@@ -49,7 +53,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-50 dark:bg-slate-900">
+  <body class="bg-slate-100 dark:bg-slate-950">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
