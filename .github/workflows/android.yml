@@ -50,13 +50,13 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 🧩 Decode and prepare keystore for signing (corrected path)
+      # 🧩 Decode and prepare keystore for signing (FIXED PATH)
       - name: 🔑 Decode Keystore
         run: |
-          mkdir -p android
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/release.keystore
-          echo "✅ Keystore decoded to android/release.keystore"
-          ls -l android/
+          mkdir -p android/app
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          echo "✅ Keystore decoded to android/app/release.keystore"
+          ls -l android/app/
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
@@ -70,7 +70,7 @@ jobs:
         run: |
           echo "🔐 Building signed release APK..."
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=release.keystore \
+            -Pandroid.injected.signing.store.file=app/release.keystore \
             -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
