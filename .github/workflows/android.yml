@@ -50,10 +50,13 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 🧩 Decode and prepare keystore for signing
+      # 🧩 Decode and prepare keystore for signing (corrected path)
       - name: 🔑 Decode Keystore
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          mkdir -p android
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/release.keystore
+          echo "✅ Keystore decoded to android/release.keystore"
+          ls -l android/
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
@@ -65,11 +68,18 @@ jobs:
       - name: 🏗️ Build Signed Release APK
         working-directory: android
         run: |
+          echo "🔐 Building signed release APK..."
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=app/release.keystore \
+            -Pandroid.injected.signing.store.file=release.keystore \
             -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+
+      # 📦 Verify that APK exists
+      - name: ✅ Verify APK existence
+        run: |
+          echo "Checking for signed APK..."
+          ls -l android/app/build/outputs/apk/release/
 
       # 📤 Upload signed APK as build artifact
       - name: 📤 Upload Signed APK artifact
