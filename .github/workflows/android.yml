@@ -1,156 +1,56 @@
-name: Build Signed Release APK
+name: Build Signed APK
 
-on:
-  push:
-    branches: [ main ]
-
-permissions:
-  contents: write
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+
+      - uses: actions/setup-java@v4
         with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Clean old assets
-        run: |
-          rm -rf android/app/src/main/assets/public
-          rm -rf dist
-
-      - name: Build React app
-        run: |
-          npm run build
-          ls -R dist
-
-      - name: Sync to Android
-        run: |
-          npx cap sync android
-          ls -R android/app/src/main/assets/public
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
       # PLACE KEYSTORE
-      - name: Decode & Place Keystore
+      - name: Place Keystore
         run: |
           mkdir -p android/app/app
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/app/release.keystore
           chmod 600 android/app/app/release.keystore
-          echo "Keystore placed at: $(pwd)/android/app/app/release.keystore"
-          ls -la android/app/app/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # DEBUG: Show what secrets are loaded
-      - name: DEBUG - Show Secret Status
-        env:
-          PASS: ${{ secrets.KEYSTORE_PASSWORD }}
-          ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+      # CONFIRM FILE EXISTS
+      - name: Confirm Keystore
         run: |
-          echo "=== SECRET DEBUG INFO ==="
-          echo "KEYSTORE_PASSWORD length: ${#PASS}"
-          echo "KEY_ALIAS length: ${#ALIAS}"
-          echo "KEY_PASSWORD length: ${#KEY_PASS}"
-          echo "KEY_ALIAS value: '$ALIAS'"
-          echo "KEYSTORE_PASSWORD value: '$PASS'"
-          echo "KEY_PASSWORD value: '$KEY_PASS'"
-          echo "=========================="
-
-          # Fail if any secret is missing
-          [ -z "$PASS" ] && echo "KEYSTORE_PASSWORD is EMPTY!" && exit 1
-          [ -z "$ALIAS" ] && echo "KEY_ALIAS is EMPTY!" && exit 1
-          [ -z "$KEY_PASS" ] && echo "KEY_PASSWORD is EMPTY!" && exit 1
-
-      # VALIDATE KEYSTORE WITH FULL DEBUG
-      - name: Validate Keystore & Credentials
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          KEYSTORE_PATH="android/app/app/release.keystore"
-          
-          echo "=== VALIDATING KEYSTORE ==="
-          echo "Path: $KEYSTORE_PATH"
-          [ ! -f "$KEYSTORE_PATH" ] && echo "FILE NOT FOUND!" && exit 1
-          echo "File size: $(stat -c%s "$KEYSTORE_PATH") bytes"
-          
-          echo "Testing with:"
-          echo "  Alias: '$KEY_ALIAS'"
-          echo "  Store Password: '$KEYSTORE_PASSWORD'"
-          echo "  Key Password: '$KEY_PASSWORD'"
-
-          # Run keytool and show output on failure
-          if keytool -list \
-            -keystore "$KEYSTORE_PATH" \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" > keytool_output.txt 2>&1; then
-            echo "VALIDATED: Keystore + credentials are correct"
-            rm keytool_output.txt
-          else
-            echo "VALIDATION FAILED"
-            echo "keytool output:"
-            cat keytool_output.txt
-            rm keytool_output.txt
-            exit 1
-          fi
+          ls -la android/app/app/release.keystore
+          file android/app/app/release.keystore
 
       # BUILD WITH ABSOLUTE PATH
-      - name: Build Signed Release APK
+      - name: Build APK
         working-directory: android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ABS_PATH="${{ github.workspace }}/android/app/app/release.keystore"
-          echo "Using absolute keystore path: $ABS_PATH"
-          [ ! -f "$ABS_PATH" ] && echo "Keystore missing at absolute path!" && exit 1
-
+          PATH="${{ github.workspace }}/android/app/app/release.keystore"
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="$ABS_PATH" \
+            -Pandroid.injected.signing.store.file="$PATH" \
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
-            --stacktrace
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
-      # VERIFY APK
-      - name: Verify APK
-        run: |
-          APK="android/app/build/outputs/apk/release/app-release.apk"
-          [ -f "$APK" ] && echo "APK BUILT: $APK" && ls -lh "$APK" || (echo "APK NOT FOUND!" && exit 1)
-
-      # UPLOAD ARTIFACT
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      # UPLOAD
+      - uses: actions/upload-artifact@v4
         with:
-          name: app-release-signed
+          name: app-release
           path: android/app/build/outputs/apk/release/app-release.apk
-
-      # GITHUB RELEASE
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: "Release #${{ github.run_number }}"
-          body: |
-            Signed APK built successfully
-            Commit: ${{ github.sha }}
-          files: android/app/build/outputs/apk/release/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
