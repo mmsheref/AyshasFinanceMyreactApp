@@ -1,9 +1,8 @@
-name: Build Android APK
+name: Build Signed Release APK
 
 on:
   push:
     branches: [ main ]
-
 
 permissions:
   contents: write
@@ -51,30 +50,45 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # 🧩 Decode and prepare keystore for signing
+      - name: 🔑 Decode Keystore
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
       - name: 🧼 Clean Android Gradle cache
         working-directory: android
         run: ./gradlew clean
 
-      - name: 🏗️ Build Android APK
+      # 🏗️ Build and sign Release APK
+      - name: 🏗️ Build Signed Release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=app/release.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      - name: 📤 Upload APK artifact
+      # 📤 Upload signed APK as build artifact
+      - name: 📤 Upload Signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AyshasFinanceApp-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: AyshasFinanceApp-release
+          path: android/app/build/outputs/apk/release/app-release.apk
 
-      - name: 🚀 Upload APK to GitHub Release
+      # 🚀 Upload to GitHub Releases
+      - name: 🚀 Upload Signed APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: "AyshasFinanceApp Release #${{ github.run_number }}"
           body: |
-            Automated release from GitHub Actions.
+            ✅ Automated signed release build
             - Built with Vite + Capacitor
             - Commit: ${{ github.sha }}
           files: |
-            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

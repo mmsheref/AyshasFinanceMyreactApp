@@ -190,6 +190,8 @@ const App: React.FC = () => {
     else navigate('dashboard');
   };
 
+  const showBottomNav = !['form'].includes(view);
+
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-200 font-sans flex flex-col">
       {/* Header */}
@@ -212,27 +214,29 @@ const App: React.FC = () => {
       </header>
       
       {/* Main Content */}
-      <main className="container mx-auto p-4 flex-grow pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className={`container mx-auto p-4 flex-grow ${showBottomNav ? "pb-[calc(5rem+env(safe-area-inset-bottom))]" : ""}`}>
         {renderView()}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-30 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
-        <div className="container mx-auto h-16 grid grid-cols-3 items-center">
-            <button onClick={() => navigate('dashboard')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'dashboard' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Dashboard">
-              <HomeIcon className="w-6 h-6 mb-1" />
-              <span className="text-xs font-medium">Dashboard</span>
-            </button>
-            <button onClick={() => navigate('records')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'records' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Records">
-              <ListIcon className="w-6 h-6 mb-1" />
-              <span className="text-xs font-medium">Records</span>
-            </button>
-            <button onClick={() => navigate('settings')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'settings' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Settings">
-              <SettingsIcon className="w-6 h-6 mb-1" />
-              <span className="text-xs font-medium">Settings</span>
-            </button>
-        </div>
-      </nav>
+      {showBottomNav && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-30 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
+          <div className="container mx-auto h-16 grid grid-cols-3 items-center">
+              <button onClick={() => navigate('dashboard')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'dashboard' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Dashboard">
+                <HomeIcon className="w-6 h-6 mb-1" />
+                <span className="text-xs font-medium">Dashboard</span>
+              </button>
+              <button onClick={() => navigate('records')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'records' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Records">
+                <ListIcon className="w-6 h-6 mb-1" />
+                <span className="text-xs font-medium">Records</span>
+              </button>
+              <button onClick={() => navigate('settings')} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${view === 'settings' ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'}`} aria-label="Settings">
+                <SettingsIcon className="w-6 h-6 mb-1" />
+                <span className="text-xs font-medium">Settings</span>
+              </button>
+          </div>
+        </nav>
+      )}
 
        {['dashboard', 'records'].includes(view) && (
         <div className="fixed bottom-[calc(5rem)] left-1/2 -translate-x-1/2 z-40 pb-[env(safe-area-inset-bottom)]">

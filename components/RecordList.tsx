@@ -26,8 +26,8 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (record: DailyRecord) =
         >
             <div className="flex justify-between items-start mb-3">
                 <div>
-                    <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{new Date(record.date).toLocaleDateString('en-GB', { month: 'long', day: 'numeric' })}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric' })}</p>
+                    <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', day: 'numeric' })}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric' })}</p>
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
                     <p className={`text-xl font-bold ${profitColor}`}>
@@ -65,7 +65,7 @@ const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
       // Search Term Filter
       if (searchTermLower) {
         return (
-          new Date(record.date).toLocaleDateString('en-GB').toLowerCase().includes(searchTermLower) ||
+          new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB').toLowerCase().includes(searchTermLower) ||
           record.date.includes(searchTermLower)
         );
       }

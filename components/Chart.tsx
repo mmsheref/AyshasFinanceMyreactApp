@@ -16,7 +16,7 @@ const Chart: React.FC<ChartProps> = ({ data }) => {
 
     const width = 500;
     const height = 200;
-    const margin = { top: 20, right: 0, bottom: 30, left: 0 };
+    const margin = { top: 20, right: 0, bottom: 40, left: 0 };
     
     if(!data || data.length === 0) return <div className="text-center text-slate-500 dark:text-slate-400 py-10">Not enough data to display chart.</div>;
 
@@ -56,7 +56,6 @@ const Chart: React.FC<ChartProps> = ({ data }) => {
                     const y = d.profit >= 0 ? zeroLineY - barHeight : zeroLineY;
 
                     const showLabel = data.length <= 15 || i % 3 === 0;
-                    const dateLabel = new Date(d.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric' });
 
                     return (
                         <g key={d.date}>
@@ -76,7 +75,8 @@ const Chart: React.FC<ChartProps> = ({ data }) => {
                                     textAnchor="middle"
                                     className="text-[10px] select-none fill-current text-slate-500 dark:text-slate-400"
                                 >
-                                    {dateLabel}
+                                    <tspan>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' })}</tspan>
+                                    <tspan x={x + barWidth / 2} dy="1.2em">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric' })}</tspan>
                                 </text>
                             )}
                         </g>
@@ -88,7 +88,7 @@ const Chart: React.FC<ChartProps> = ({ data }) => {
                     className="absolute bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs rounded-lg py-2 px-3 shadow-lg pointer-events-none transition-opacity duration-200 border border-slate-200 dark:border-slate-700"
                     style={{ left: tooltip.x, top: tooltip.y, transform: 'translate(-50%, -110%)' }}
                 >
-                    <p className="font-bold text-sm mb-1">{new Date(tooltip.data.date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}</p>
+                    <p className="font-bold text-sm mb-1">{new Date(tooltip.data.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}</p>
                     <p className={`font-semibold mb-1 text-base ${tooltip.data.profit >= 0 ? 'text-success' : 'text-error'}`}>
                         ₹{tooltip.data.profit.toLocaleString('en-IN')}
                         <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">Profit</span>

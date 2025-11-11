@@ -23,7 +23,7 @@ const Dashboard: React.FC<DashboardProps> = ({ records, onViewRecord }) => {
     const recordsWithProfit = records.map(r => ({
       ...r,
       profit: (r.totalSales || 0) - calculateTotalExpenses(r),
-      dateObj: new Date(r.date)
+      dateObj: new Date(r.date + 'T00:00:00')
     }));
 
     const today = new Date();
@@ -118,11 +118,11 @@ const Dashboard: React.FC<DashboardProps> = ({ records, onViewRecord }) => {
                     return (
                         <li key={record.id} onClick={() => onViewRecord(record)} className="p-4 flex items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mr-4 flex-shrink-0">
-                                <span className="font-bold text-primary text-sm">{new Date(record.date).toLocaleDateString('en-GB', { day: 'numeric' })}</span>
+                                <span className="font-bold text-primary text-sm">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric' })}</span>
                             </div>
                             <div className="flex-grow">
-                                <p className="font-semibold text-slate-800 dark:text-slate-100">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long' })}</p>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
+                                <p className="font-semibold text-slate-800 dark:text-slate-100">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long' })}</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
                             </div>
                              <p className={`font-bold text-lg text-right ml-2 ${profit >= 0 ? 'text-success' : 'text-error'}`}>
                                 {profit >= 0 ? '+' : ''}₹{Math.abs(profit).toLocaleString('en-IN')}
