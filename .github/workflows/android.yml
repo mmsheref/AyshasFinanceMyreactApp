@@ -12,59 +12,66 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout source
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Set up Node.js for React build
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      # 3. Install dependencies
       - name: Install dependencies
         run: npm ci
 
+      # 4. Clean old assets and builds
       - name: Clean old assets
         run: |
           rm -rf android/app/src/main/assets/public
           rm -rf dist
 
+      # 5. Build React app for production
       - name: Build React app
         run: |
           npm run build
           ls -R dist
 
+      # 6. Sync web assets to Android
       - name: Sync to Android
         run: |
           npx cap sync android
 
+      # 7. Set up Java for Gradle
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      # PLACE KEYSTORE
+      # 8. Decode and place the release keystore
       - name: Decode & Place Keystore
         run: |
-          mkdir -p android/app/app
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/app/release.keystore
-          chmod 600 android/app/app/release.keystore
+          mkdir -p android/app
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          chmod 600 android/app/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # VALIDATE
+      # 9. [IMPROVED] Validate Keystore & Credentials
       - name: Validate Keystore & Credentials
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          KEYSTORE_PATH="android/app/app/release.keystore"
-          echo "Validating: $KEYSTORE_PATH"
-          [ ! -f "$KEYSTORE_PATH" ] && exit 1
-          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>&1 && echo "VALID" || (echo "FAIL" && exit 1)
+          echo "Checking keystore integrity..."
+          keytool -list -v -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD"
+          
+          echo "Checking for alias..."
+          keytool -list -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS"
 
-      # BUILD
+      # 10. Build the signed release APK
       - name: Build Signed Release APK
         working-directory: android
         env:
@@ -72,7 +79,8 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ABS_PATH="${{ github.workspace }}/android/app/app/release.keystore"
+          ABS_PATH="${{ github.workspace }}/android/app/release.keystore"
+          echo "Keystore path: $ABS_PATH"
           ./gradlew clean --no-daemon
           ./gradlew assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$ABS_PATH" \
@@ -81,9 +89,10 @@ jobs:
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
             --stacktrace
 
-      # UPLOAD
+      # 11. Upload the release APK as an artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: android/app/build/outputs/apk/release/app-release.apk
+
