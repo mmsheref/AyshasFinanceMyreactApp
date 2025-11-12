@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import BackupRestore from './BackupRestore';
 import { useAppContext } from '../context/AppContext';
 import ExpenseStructureManager from './ExpenseStructureManager';
-import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, HeartIcon } from './Icons';
+import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon } from './Icons';
 import Modal from './Modal';
 
 interface SettingsItemProps {
@@ -100,7 +100,7 @@ const SettingsPage: React.FC = () => {
         <SettingsItem icon={<InformationCircleIcon className="w-5 h-5" />} title="App Version" description="You are running the latest version of the application.">
           <span className="inline-block bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-mono py-1 px-2 rounded-md">v1.2.0</span>
         </SettingsItem>
-         <SettingsItem icon={<HeartIcon className="w-5 h-5" />} title="Crafted by Ameer" description="Designed & developed for Aysha's." />
+         <SettingsItem icon={<CodeBracketIcon className="w-5 h-5" />} title="Application Development" description="Designed and developed by Ameer." />
       </SettingsGroup>
 
       {isStructureModalOpen && (
