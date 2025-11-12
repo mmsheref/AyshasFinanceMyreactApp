@@ -71,13 +71,17 @@ const RecordForm: React.FC = () => {
   }, [recordId, isEditing, getRecordById, navigate, customStructure, sortedRecords]);
 
   useEffect(() => {
-    if (formData?.date && !isEditing) {
-        const dateExists = allRecords.some(r => r.id === formData.date);
-        setDateError(dateExists ? 'A record for this date already exists.' : '');
-    } else {
-        setDateError('');
+    if (!formData?.date) {
+      setDateError('');
+      return;
     }
-  }, [formData?.date, allRecords, isEditing]);
+    // A date is invalid if a record exists with that date, AND it's not the record we are currently editing.
+    // For new records, `recordId` is undefined, so the check correctly flags any existing record.
+    const dateIsTakenByAnotherRecord = allRecords.some(r => r.id === formData.date && r.id !== recordId);
+    
+    setDateError(dateIsTakenByAnotherRecord ? 'A record for this date already exists.' : '');
+
+  }, [formData?.date, allRecords, recordId]);
 
   const totalExpenses = useMemo(() => {
     if (!formData) return 0;
@@ -154,7 +158,8 @@ const RecordForm: React.FC = () => {
     e.preventDefault();
     if (!formData.date) { alert('Please select a date.'); return; }
     if (dateError) { alert(dateError); return; }
-    await handleSave(formData);
+    // Pass the original recordId when editing, so the context knows how to handle date changes.
+    await handleSave(formData, isEditing ? recordId : undefined);
     navigate(`/records/${formData.id}`);
   };
 

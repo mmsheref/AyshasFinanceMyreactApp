@@ -14,7 +14,7 @@ interface AppContextType {
     theme: Theme;
     setTheme: (theme: Theme) => void;
     getRecordById: (id: string) => DailyRecord | undefined;
-    handleSave: (record: DailyRecord) => Promise<void>;
+    handleSave: (record: DailyRecord, originalId?: string) => Promise<void>;
     handleDelete: (id: string) => Promise<void>;
     handleRestore: (data: BackupData) => Promise<number>;
     handleUpdateStructure: (newStructure: CustomExpenseStructure) => Promise<void>;
@@ -112,21 +112,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setRecords(prevRecords => prevRecords.filter(r => r.id !== id));
     };
 
-    const handleSave = async (record: DailyRecord) => {
-        const isEditing = records.some(r => r.id === record.id && r.date !== record.date); // ID is date, so this check is for edit vs new
-        const exists = records.some(r => r.id === record.id);
-        
-        if (!isEditing && exists) {
+    const handleSave = async (record: DailyRecord, originalId?: string) => {
+        const newId = record.id;
+        // For a new record, originalId is undefined, so oldId will be the same as newId.
+        // For an existing record, originalId is provided.
+        const oldId = originalId || newId;
+
+        // Prevent saving if the new date is already taken by a *different* record.
+        if (newId !== oldId && records.some(r => r.id === newId)) {
+            // This is a server-side check; the form should prevent this state.
             throw new Error('A record for this date already exists.');
         }
-
+        
+        // If the ID (date) has changed during an edit, we must remove the old record.
+        if (newId !== oldId) {
+            await db.deleteRecord(oldId);
+        }
+        // 'put' operation in IndexedDB will add or update the record.
         await db.saveRecord(record);
+
         setRecords(prevRecords => {
-            if (exists) {
-                return prevRecords.map(r => (r.id === record.id ? record : r));
-            } else {
-                return [...prevRecords, record];
-            }
+            // Remove the old record if its ID has changed or if it existed.
+            const recordsWithoutOld = prevRecords.filter(r => r.id !== oldId);
+            // Add the new/updated record.
+            return [...recordsWithoutOld, record];
         });
     };
     
