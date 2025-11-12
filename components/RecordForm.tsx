@@ -27,6 +27,8 @@ const RecordForm: React.FC = () => {
   const [formData, setFormData] = useState<DailyRecord | null>(null);
   const [dateError, setDateError] = useState('');
   const [isAddItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [isAddCategoryModalOpen, setAddCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [newItem, setNewItem] = useState({ name: '', categoryIndex: 0, saveForFuture: false, defaultValue: 0 });
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{catIndex: number, itemIndex: number, itemName: string} | null>(null);
@@ -144,6 +146,36 @@ const RecordForm: React.FC = () => {
     setAddItemModalOpen(false);
   };
 
+  const handleAddNewCategory = () => {
+    if (!formData) return;
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) {
+      alert("Category name cannot be empty.");
+      return;
+    }
+    if (formData.expenses.some(cat => cat.name.toLowerCase() === trimmedName.toLowerCase())) {
+      alert("This category already exists in this record.");
+      return;
+    }
+    const newCategory = {
+      id: uuidv4(),
+      name: trimmedName,
+      items: [],
+    };
+    const updatedExpenses = [...formData.expenses, newCategory];
+    setFormData({ ...formData, expenses: updatedExpenses });
+    setAddCategoryModalOpen(false);
+    setNewCategoryName('');
+
+    setTimeout(() => {
+      setOpenCategory(trimmedName);
+      const newCategoryRef = categoryRefs.current[trimmedName];
+      if (newCategoryRef) {
+          newCategoryRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
+
   const confirmRemoveExpenseItem = () => {
     if (deleteConfirmation) {
         const { catIndex, itemIndex } = deleteConfirmation;
@@ -193,7 +225,7 @@ const RecordForm: React.FC = () => {
   const inputStyles = "w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 pb-24">
+    <form onSubmit={handleSubmit} className="space-y-6 pb-40">
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm space-y-4">
         <div>
             <label htmlFor="date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date</label>
@@ -288,6 +320,13 @@ const RecordForm: React.FC = () => {
             </div>
           )
         })}
+        <button 
+          type="button" 
+          onClick={() => setAddCategoryModalOpen(true)} 
+          className="mt-2 w-full text-sm font-semibold flex items-center justify-center p-2.5 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-primary hover:text-primary transition-colors"
+        >
+          <PlusIcon className="w-5 h-5 mr-2"/> Add New Category
+        </button>
       </div>
       
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-40 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
@@ -339,6 +378,24 @@ const RecordForm: React.FC = () => {
                 <div className="mt-6 flex justify-end space-x-3">
                     <button type="button" onClick={() => setAddItemModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button>
                     <button type="button" onClick={handleAddNewItem} className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary">Add Item</button>
+                </div>
+            </div>
+        </Modal>
+      )}
+
+      {isAddCategoryModalOpen && (
+        <Modal onClose={() => setAddCategoryModalOpen(false)}>
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-xl">
+                <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Add New Expense Category</h3>
+                <div className="space-y-4">
+                    <div>
+                        <label htmlFor="newCategoryName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Category Name</label>
+                        <input type="text" id="newCategoryName" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className={inputStyles} placeholder="e.g., Beverages"/>
+                    </div>
+                </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                    <button type="button" onClick={() => setAddCategoryModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button>
+                    <button type="button" onClick={handleAddNewCategory} className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary">Add Category</button>
                 </div>
             </div>
         </Modal>
