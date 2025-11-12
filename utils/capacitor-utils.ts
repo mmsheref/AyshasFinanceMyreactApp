@@ -13,7 +13,7 @@ const saveFile = async (fileName: string, data: string, mimeType: string, savedM
   try {
     if (Capacitor.isNativePlatform()) {
       // Native: Use Capacitor Filesystem to save in the Documents directory.
-      await Filesystem.requestPermissions();
+      // requestPermissions is deprecated; writeFile will trigger OS-level prompts if needed.
       await Filesystem.writeFile({
         path: fileName,
         data: data,
@@ -55,6 +55,20 @@ export const saveBackupFile = async (fileName: string, data: string): Promise<vo
 };
 
 /**
+ * Saves the JSON structure file.
+ * @param fileName - The name of the file to save.
+ * @param data - The JSON string content of the file.
+ */
+export const saveStructureFile = async (fileName: string, data: string): Promise<void> => {
+  await saveFile(
+    fileName,
+    data,
+    'application/json',
+    'Structure file saved successfully to Documents folder.'
+  );
+};
+
+/**
  * Saves a CSV export file.
  * @param fileName - The name of the file to save.
  * @param data - The CSV string content of the file.
@@ -88,18 +102,21 @@ export const shareBackupData = async (fileName: string, data: string, title: str
             await Share.share({
                 title: title,
                 text: `Backup data for Aysha's P&L.`,
-                url: result.uri, // The URI of the saved file
+                files: [result.uri], // Correctly use the 'files' array for local files
             });
         } else {
-            // Web: Use the Web Share API with text, as file sharing can be inconsistent.
-             if (navigator.share) {
+            // Web: Use the Web Share API with a File object for better compatibility.
+            const blob = new Blob([data], { type: 'application/json' });
+            const file = new File([blob], fileName, { type: 'application/json' });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: title,
-                    text: data,
+                    files: [file],
                 });
             } else {
-                // Fallback for browsers that don't support Web Share API.
-                alert('Web Share API is not supported on this browser. Saving file instead.');
+                // Fallback for browsers that don't support Web Share API or file sharing.
+                alert('Web Share API not supported on this browser. Saving file instead.');
                 await saveBackupFile(fileName, data);
             }
         }
@@ -125,7 +142,7 @@ export const shareImageFile = async (fileName: string, base64Data: string, title
     try {
         if (Capacitor.isNativePlatform()) {
             // Native: Save the base64 data URL as a file in the cache directory,
-            // then share the resulting file URI. The Share plugin expects a file path.
+            // then share the resulting file URI.
             const result = await Filesystem.writeFile({
                 path: fileName,
                 data: base64Data, // Capacitor's writeFile can handle data URLs
@@ -135,7 +152,7 @@ export const shareImageFile = async (fileName: string, base64Data: string, title
             await Share.share({
                 title: title,
                 text: text,
-                url: result.uri, // Share the URI of the newly created file.
+                files: [result.uri], // Correctly use the 'files' array for local files
                 dialogTitle: 'Share Report'
             });
         } else {

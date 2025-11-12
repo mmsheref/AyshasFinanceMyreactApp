@@ -1,53 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { DailyRecord } from '../types';
-import { DeleteIcon, EditIcon, EyeIcon, ShareIcon, ChevronLeftIcon, ChevronRightIcon } from './Icons';
+import React, { useState, useEffect, useMemo } from 'react';
+import { flushSync } from 'react-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
+import { DeleteIcon, EditIcon, EyeIcon, ShareIcon, ChevronLeftIcon, ChevronRightIcon, WarningIcon } from './Icons';
 import Modal from './Modal';
 import { shareImageFile } from '../utils/capacitor-utils';
 import ShareableReport from './ShareableReport';
+import { calculateTotalExpenses } from '../utils/record-utils';
 
 declare var html2canvas: any;
 
-interface RecordDetailProps {
-  record: DailyRecord;
-  onDelete: (id: string) => void;
-  onEdit: (record: DailyRecord) => void;
-}
-
-const RecordDetail: React.FC<RecordDetailProps> = ({ record, onDelete, onEdit }) => {
+const RecordDetail: React.FC = () => {
+  const { recordId } = useParams<{ recordId: string }>();
+  const navigate = useNavigate();
+  const { getRecordById, handleDelete } = useAppContext();
+  
+  const record = useMemo(() => recordId ? getRecordById(recordId) : undefined, [recordId, getRecordById]);
+  
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isSharing, setIsSharing] = useState(false);
   const [isPreparingShare, setIsPreparingShare] = useState(false);
-
-  const totalExpenses = record.expenses.reduce((total, category) =>
-    total + category.items.reduce((catTotal, item) => catTotal + item.amount, 0),
-    0
-  );
-  const profit = record.totalSales - totalExpenses;
-
-  const handleShare = async () => {
-    setIsSharing(true);
-    setIsPreparingShare(true);
-  };
-
-  const openPhotoViewer = (photos: string[], startIndex: number) => {
-    setViewingPhotos(photos);
-    setCurrentPhotoIndex(startIndex);
-  };
-
-  const closePhotoViewer = () => {
-    setViewingPhotos(null);
-  };
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!isPreparingShare) return;
+    if (!isPreparingShare || !record) return;
 
     const generateAndShareImage = async () => {
-      // Allow React to render the hidden component
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      const wrapper = document.getElementById('share-report-wrapper');
       const elementToCapture = document.getElementById('share-report-source');
-      if (!elementToCapture) {
+      const isDarkMode = document.documentElement.classList.contains('dark');
+
+      if (!wrapper || !elementToCapture) {
         alert('Failed to prepare report for sharing.');
         setIsSharing(false);
         setIsPreparingShare(false);
@@ -55,35 +39,68 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ record, onDelete, onEdit })
       }
 
       try {
+        // Temporarily apply dark mode to wrapper if needed for capture
+        if (isDarkMode) {
+          wrapper.classList.add('dark');
+        }
+
         const canvas = await html2canvas(elementToCapture, { 
           scale: 2, 
           useCORS: true,
-          backgroundColor: '#ffffff'
         });
+
         const base64Data = canvas.toDataURL('image/png');
         const fileName = `Ayshas-Report-${record.date}.png`;
         const title = `P&L Report for ${record.date}`;
-        const text = `Report for ${new Date(record.date).toLocaleDateString('en-GB')}`;
+        const text = `Report for ${new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB')}`;
         
         await shareImageFile(fileName, base64Data, title, text);
-
       } catch (error) {
         console.error('Error sharing report:', error);
         alert('An error occurred while sharing.');
       } finally {
+        // Clean up class and state
+        if (isDarkMode) {
+          wrapper.classList.remove('dark');
+        }
         setIsSharing(false);
         setIsPreparingShare(false);
       }
     };
 
     generateAndShareImage();
-
   }, [isPreparingShare, record]);
 
+  if (!record) {
+    return <Navigate to="/records" replace />;
+  }
+
+  const totalExpenses = calculateTotalExpenses(record);
+  const profit = record.totalSales - totalExpenses;
+  const nightSales = record.totalSales - record.morningSales;
+
+  const onConfirmDelete = async () => {
+      await handleDelete(record.id);
+      setIsDeleteModalOpen(false);
+      navigate('/records');
+  };
+
+  const handleShare = () => {
+    flushSync(() => {
+      setIsSharing(true);
+      setIsPreparingShare(true);
+    });
+  };
+
+  const openPhotoViewer = (photos: string[], startIndex: number) => {
+    setViewingPhotos(photos);
+    setCurrentPhotoIndex(startIndex);
+  };
+  
   return (
     <div className="space-y-6">
       {isPreparingShare && (
-        <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -100 }}>
+        <div id="share-report-wrapper" style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -100 }}>
           <ShareableReport record={record} id="share-report-source" />
         </div>
       )}
@@ -91,14 +108,19 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ record, onDelete, onEdit })
       <div id="report-container" className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-xl shadow-sm">
         <div className="text-center border-b border-slate-200 dark:border-slate-800 pb-4 mb-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">Report for</p>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl">
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Total Sales</p>
-                <p className="text-2xl font-bold text-primary">₹{record.totalSales.toLocaleString('en-IN')}</p>
+            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl flex flex-col justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Total Sales</p>
+                  <p className="text-2xl font-bold text-primary">₹{record.totalSales.toLocaleString('en-IN')}</p>
+                </div>
+                <div className="text-xs space-y-1 text-left border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+                    <p className="flex justify-between"><span>Morning:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">₹{(record.morningSales || 0).toLocaleString('en-IN')}</span></p>
+                    <p className="flex justify-between"><span>Night:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">₹{nightSales.toLocaleString('en-IN')}</span></p>
+                </div>
             </div>
             <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl">
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Total Expenses</p>
@@ -110,7 +132,6 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ record, onDelete, onEdit })
             </div>
         </div>
 
-        {/* Expense Details */}
         <div className="space-y-4 pt-6">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 text-center">Expense Breakdown</h3>
           {record.expenses.map(category => {
@@ -146,24 +167,23 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ record, onDelete, onEdit })
         </div>
       </div>
 
-      {/* Action Bar */}
       <div className="bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm flex justify-around items-center no-capture">
         <button onClick={handleShare} disabled={isSharing} className="flex flex-col items-center text-slate-600 dark:text-slate-300 hover:text-primary transition-colors disabled:opacity-50 w-24 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Share report">
             <ShareIcon className="w-6 h-6 mb-1"/>
-            <span className="text-xs font-medium">{isSharing ? 'Sharing...' : 'Share'}</span>
+            <span className="text-xs font-medium">{isSharing ? 'Preparing Report...' : 'Share'}</span>
         </button>
-        <button onClick={() => onEdit(record)} className="flex flex-col items-center text-slate-600 dark:text-slate-300 hover:text-primary transition-colors w-24 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Edit record">
+        <button onClick={() => navigate(`/records/${record.id}/edit`)} className="flex flex-col items-center text-slate-600 dark:text-slate-300 hover:text-primary transition-colors w-24 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Edit record">
             <EditIcon className="w-6 h-6 mb-1"/>
             <span className="text-xs font-medium">Edit</span>
         </button>
-        <button onClick={() => onDelete(record.id)} className="flex flex-col items-center text-slate-600 dark:text-slate-300 hover:text-error transition-colors w-24 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Delete record">
+        <button onClick={() => setIsDeleteModalOpen(true)} className="flex flex-col items-center text-slate-600 dark:text-slate-300 hover:text-error transition-colors w-24 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Delete record">
             <DeleteIcon className="w-6 h-6 mb-1"/>
             <span className="text-xs font-medium">Delete</span>
         </button>
       </div>
 
       {viewingPhotos && (
-        <Modal onClose={closePhotoViewer}>
+        <Modal onClose={() => setViewingPhotos(null)}>
             <div className="relative">
                 <img src={viewingPhotos[currentPhotoIndex]} alt={`Bill ${currentPhotoIndex + 1} of ${viewingPhotos.length}`} className="max-w-full max-h-[80vh] rounded-lg" />
                 {viewingPhotos.length > 1 && (
@@ -187,6 +207,25 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ record, onDelete, onEdit })
                         </div>
                     </>
                 )}
+            </div>
+        </Modal>
+      )}
+
+      {isDeleteModalOpen && (
+        <Modal onClose={() => setIsDeleteModalOpen(false)}>
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-xl text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30">
+                    <WarningIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className="text-xl font-bold mt-4 mb-2 dark:text-slate-100">Delete Record</h3>
+                <p className="text-slate-600 dark:text-slate-300 mb-6">
+                    Are you sure you want to permanently delete the record for <br/>
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', day: 'numeric' })}</span>?
+                </p>
+                <div className="flex justify-center space-x-4">
+                    <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                    <button type="button" onClick={onConfirmDelete} className="px-5 py-2.5 bg-error text-white rounded-lg text-sm font-semibold hover:bg-red-700 shadow-sm transition-colors">Delete</button>
+                </div>
             </div>
         </Modal>
       )}

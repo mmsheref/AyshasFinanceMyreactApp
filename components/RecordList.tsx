@@ -1,27 +1,19 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DailyRecord } from '../types';
 import { SearchIcon, CalendarIcon, XMarkIcon } from './Icons';
-import Modal from './Modal';
+import { useAppContext } from '../context/AppContext';
+import { calculateTotalExpenses } from '../utils/record-utils';
+import DateRangePicker from './DateRangePicker';
 
-interface RecordListProps {
-  records: DailyRecord[];
-  onView: (record: DailyRecord) => void;
-}
-
-const calculateTotalExpenses = (record: DailyRecord) => {
-    return record.expenses.reduce((total, category) => 
-        total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 
-    0);
-};
-
-const RecordCard: React.FC<{record: DailyRecord, onView: (record: DailyRecord) => void}> = ({ record, onView }) => {
+const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => void}> = React.memo(({ record, onView }) => {
     const totalExpenses = calculateTotalExpenses(record);
     const profit = record.totalSales - totalExpenses;
     const profitColor = profit >= 0 ? 'text-success' : 'text-error';
 
     return (
         <div 
-            onClick={() => onView(record)}
+            onClick={() => onView(record.id)}
             className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border border-transparent hover:border-primary/30"
         >
             <div className="flex justify-between items-start mb-3">
@@ -42,64 +34,38 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (record: DailyRecord) =
             </div>
         </div>
     );
-};
+});
 
-const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
+const RecordList: React.FC = () => {
+  const { sortedRecords: records } = useAppContext();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
-  const [tempDateRange, setTempDateRange] = useState({ startDate: '', endDate: '' });
 
   const filteredRecords = useMemo(() => {
     const searchTermLower = searchTerm.toLowerCase();
 
     return records.filter(record => {
-      // Date Range Filter
       const recordDate = record.date;
       const afterStartDate = !dateRange.startDate || recordDate >= dateRange.startDate;
       const beforeEndDate = !dateRange.endDate || recordDate <= dateRange.endDate;
-      if (!afterStartDate || !beforeEndDate) {
-        return false;
-      }
+      if (!afterStartDate || !beforeEndDate) return false;
       
-      // Search Term Filter
       if (searchTermLower) {
         return (
           new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB').toLowerCase().includes(searchTermLower) ||
           record.date.includes(searchTermLower)
         );
       }
-      
       return true;
     });
   }, [records, searchTerm, dateRange]);
 
-  const openDateModal = () => {
-    setTempDateRange(dateRange);
-    setIsDateModalOpen(true);
-  };
-
-  const handleTempDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setTempDateRange(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleApplyDates = () => {
-    setDateRange(tempDateRange);
-    setIsDateModalOpen(false);
-  };
-
-  const clearMainDateFilter = () => {
-    setDateRange({ startDate: '', endDate: '' });
-  };
-  
-  const clearModalDates = () => {
-    setTempDateRange({ startDate: '', endDate: '' });
-  }
+  const clearDateFilter = () => setDateRange({ startDate: '', endDate: '' });
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    // Add time to treat date as local, preventing timezone issues
     return new Date(dateString + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
@@ -122,8 +88,6 @@ const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
       </div>
     );
   }
-
-  const inputStyles = "w-full px-3 py-2 border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition";
   
   return (
     <div className="space-y-4">
@@ -140,7 +104,7 @@ const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={openDateModal}
+            onClick={() => setIsDateModalOpen(true)}
             className="w-full flex items-center text-left px-3 py-2 border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 rounded-lg shadow-sm hover:border-primary/50 transition"
           >
             <CalendarIcon className="w-5 h-5 mr-2 text-slate-500 flex-shrink-0" />
@@ -150,7 +114,7 @@ const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
           </button>
           {isDateFilterActive && (
             <button
-              onClick={clearMainDateFilter}
+              onClick={clearDateFilter}
               className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition flex-shrink-0"
               aria-label="Clear date filter"
             >
@@ -162,8 +126,10 @@ const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
 
       {filteredRecords.length > 0 ? (
         <div className="space-y-3">
-            {filteredRecords.map(record => (
-                <RecordCard key={record.id} record={record} onView={onView} />
+            {filteredRecords.map((record) => (
+                <div key={record.id}>
+                    <RecordCard record={record} onView={(id) => navigate(`/records/${id}`)} />
+                </div>
             ))}
         </div>
       ) : (
@@ -172,30 +138,12 @@ const RecordList: React.FC<RecordListProps> = ({ records, onView }) => {
         </div>
       )}
 
-      {isDateModalOpen && (
-        <Modal onClose={() => setIsDateModalOpen(false)}>
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-xl">
-            <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Filter Records by Date</h3>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Start Date</label>
-                <input type="date" name="startDate" id="startDate" value={tempDateRange.startDate} onChange={handleTempDateChange} className={inputStyles} max={tempDateRange.endDate || undefined} />
-              </div>
-              <div>
-                <label htmlFor="endDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">End Date</label>
-                <input type="date" name="endDate" id="endDate" value={tempDateRange.endDate} onChange={handleTempDateChange} className={inputStyles} min={tempDateRange.startDate || undefined} />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-between items-center">
-              <button onClick={clearModalDates} className="text-sm font-semibold text-primary hover:underline">Clear</button>
-              <div className="flex space-x-3">
-                 <button type="button" onClick={() => setIsDateModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button>
-                 <button type="button" onClick={handleApplyDates} className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary">Apply</button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <DateRangePicker 
+        isOpen={isDateModalOpen}
+        onClose={() => setIsDateModalOpen(false)}
+        onApply={setDateRange}
+        initialRange={dateRange}
+      />
     </div>
   );
 };

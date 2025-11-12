@@ -1,17 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-g" />
+    <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#7c3aed" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1e293b" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="/vite.svg" />
     <title>Aysha's P&L Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes scaleIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* Animation utility classes */
+      .animate-fadeInUp {
+        animation: fadeInUp 0.4s ease-out forwards;
+        animation-fill-mode: backwards;
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.3s ease-in-out forwards;
+        animation-fill-mode: backwards;
+      }
+      .animate-scaleIn {
+        animation: scaleIn 0.3s ease-out forwards;
+        animation-fill-mode: backwards;
+      }
+    </style>
     <script>
+      // Anti-flicker theme script
+      (function() {
+        const theme = localStorage.getItem('theme');
+        const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+
       tailwind.config = {
         darkMode: 'class', // Enable class-based dark mode
         theme: {
@@ -45,7 +97,11 @@
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^6.25.1",
+    "react-router-dom/": "https://aistudiocdn.com/react-router-dom@^6.25.1/",
     "@capacitor/core": "https://aistudiocdn.com/@capacitor/core@^7.4.4",
+    "@capacitor/app": "https://aistudiocdn.com/@capacitor/app@^7.0.0",
     "@capacitor/filesystem": "https://aistudiocdn.com/@capacitor/filesystem@^7.1.4",
     "@capacitor/share": "https://aistudiocdn.com/@capacitor/share@^7.0.2"
   }

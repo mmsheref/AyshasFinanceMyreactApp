@@ -15,11 +15,17 @@ export interface DailyRecord {
   id: string; // Using date as string 'YYYY-MM-DD' for simplicity and uniqueness
   date: string;
   totalSales: number;
+  morningSales: number;
   expenses: ExpenseCategory[];
 }
 
+export interface ExpenseStructureItem {
+  name: string;
+  defaultValue: number;
+}
+
 export type CustomExpenseStructure = {
-  [categoryName: string]: string[];
+  [categoryName: string]: ExpenseStructureItem[];
 };
 
 export interface BackupData {

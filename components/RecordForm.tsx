@@ -1,123 +1,141 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import { DailyRecord, ExpenseCategory, CustomExpenseStructure } from '../types';
-import { generateNewRecordExpenses, FALLBACK_ITEM_COSTS } from '../constants';
+import { DailyRecord } from '../types';
+import { generateNewRecordExpenses, CATEGORIES_WITH_BILL_UPLOAD } from '../constants';
+import { useAppContext } from '../context/AppContext';
 import ImageUpload from './ImageUpload';
 import Modal from './Modal';
 import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon } from './Icons';
 
-interface RecordFormProps {
-  record: DailyRecord | null;
-  onSave: (record: DailyRecord) => void;
-  onCancel: () => void;
-  allRecords: DailyRecord[];
-  customStructure: CustomExpenseStructure;
-  onSaveCustomItem: (categoryName: string, itemName: string) => void;
-}
+const RECURRING_EXPENSE_CATEGORIES = ['Labours', 'Fixed Costs'];
 
-const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRecords, customStructure, onSaveCustomItem }) => {
-  const [formData, setFormData] = useState<DailyRecord>(() => {
-    if (record) {
-      return JSON.parse(JSON.stringify(record));
-    }
-    
-    const newStructure = generateNewRecordExpenses(customStructure);
-    const mostRecentRecord = allRecords[0];
+const RecordForm: React.FC = () => {
+  const { recordId } = useParams<{ recordId: string }>();
+  const navigate = useNavigate();
+  const { 
+    getRecordById, 
+    handleSave, 
+    sortedRecords, 
+    customStructure, 
+    handleSaveCustomItem,
+    records: allRecords
+  } = useAppContext();
+  
+  const isEditing = !!recordId;
 
-    newStructure.forEach(category => {
-      category.items.forEach(item => {
-        let amount = 0;
-        const recentCategory = mostRecentRecord?.expenses.find(c => c.name === category.name);
-        const recentItem = recentCategory?.items.find(i => i.name === item.name);
-
-        if ((category.name === 'Labours' || category.name === 'Fixed Costs') && recentItem) {
-          amount = recentItem.amount;
-        } else if (FALLBACK_ITEM_COSTS[item.name]) {
-          amount = FALLBACK_ITEM_COSTS[item.name];
-        }
-        item.amount = amount;
-      });
-    });
-
-    const today = new Date().toISOString().split('T')[0];
-    return {
-      id: today,
-      date: today,
-      totalSales: 0,
-      expenses: newStructure
-    };
-  });
-
+  const [formData, setFormData] = useState<DailyRecord | null>(null);
   const [dateError, setDateError] = useState('');
   const [isAddItemModalOpen, setAddItemModalOpen] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', categoryIndex: 0, saveForFuture: false });
-  const [openCategory, setOpenCategory] = useState<string | null>(() => {
-    return localStorage.getItem('ayshas-last-open-category') || formData.expenses[0]?.name || null;
-  });
+  const [newItem, setNewItem] = useState({ name: '', categoryIndex: 0, saveForFuture: false, defaultValue: 0 });
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{catIndex: number, itemIndex: number, itemName: string} | null>(null);
   const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
 
   useEffect(() => {
-    if (!record) {
-        const dateExists = allRecords.some(r => r.id === formData.date);
-        if (dateExists) {
-            setDateError('A record for this date already exists.');
+    const initializeForm = () => {
+      if (isEditing) {
+        const recordToEdit = getRecordById(recordId);
+        if (recordToEdit) {
+          setFormData(JSON.parse(JSON.stringify(recordToEdit))); // Deep copy
         } else {
-            setDateError('');
+          navigate('/records'); // Record not found, redirect
         }
-    }
-  }, [formData.date, allRecords, record]);
+      } else {
+        const newExpenses = generateNewRecordExpenses(customStructure);
+        const mostRecentRecord = sortedRecords[0];
 
-  const totalExpenses = useMemo(() => formData.expenses.reduce((total, category) => 
-    total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 0), [formData.expenses]);
+        if (mostRecentRecord) {
+            newExpenses.forEach(category => {
+                if (RECURRING_EXPENSE_CATEGORIES.includes(category.name)) {
+                    const correspondingOldCategory = mostRecentRecord.expenses.find(c => c.name === category.name);
+                    if (correspondingOldCategory) {
+                        category.items.forEach(item => {
+                            const correspondingOldItem = correspondingOldCategory.items.find(i => i.name === item.name);
+                            if (correspondingOldItem) {
+                                item.amount = correspondingOldItem.amount;
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        const today = new Date().toISOString().split('T')[0];
+        setFormData({
+          id: today, date: today, totalSales: 0, morningSales: 0, expenses: newExpenses
+        });
+        setOpenCategory(localStorage.getItem('ayshas-last-open-category') || newExpenses[0]?.name || null);
+      }
+    };
+    initializeForm();
+  }, [recordId, isEditing, getRecordById, navigate, customStructure, sortedRecords]);
+
+  useEffect(() => {
+    if (formData?.date && !isEditing) {
+        const dateExists = allRecords.some(r => r.id === formData.date);
+        setDateError(dateExists ? 'A record for this date already exists.' : '');
+    } else {
+        setDateError('');
+    }
+  }, [formData?.date, allRecords, isEditing]);
+
+  const totalExpenses = useMemo(() => {
+    if (!formData) return 0;
+    return formData.expenses.reduce((total, category) => 
+        total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 
+    0);
+  }, [formData?.expenses]);
   
-  const profit = useMemo(() => (formData.totalSales || 0) - totalExpenses, [formData.totalSales, totalExpenses]);
+  const profit = useMemo(() => {
+    if (!formData) return 0;
+    return (formData.totalSales || 0) - totalExpenses;
+  }, [formData?.totalSales, totalExpenses]);
+
+  const nightSales = useMemo(() => {
+    if (!formData) return 0;
+    return (formData.totalSales || 0) - (formData.morningSales || 0);
+  }, [formData?.totalSales, formData?.morningSales]);
+
+  if (!formData) return null; // Or a loading spinner
+
+  const { totalSales, expenses, morningSales } = formData;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const updatedFormData = { ...formData };
     if (name === 'date') {
-        setFormData({ ...formData, date: value, id: value });
+        updatedFormData.date = value;
+        updatedFormData.id = value;
     } else {
         const parsedValue = parseFloat(value);
-        setFormData({ ...formData, [name]: isNaN(parsedValue) ? 0 : parsedValue });
+        (updatedFormData as any)[name] = isNaN(parsedValue) ? 0 : parsedValue;
     }
+    setFormData(updatedFormData);
   };
 
   const handleExpenseChange = (catIndex: number, itemIndex: number, value: number) => {
-    const newExpenses = [...formData.expenses];
+    const newExpenses = [...expenses];
     newExpenses[catIndex].items[itemIndex].amount = value;
     setFormData({ ...formData, expenses: newExpenses });
   };
   
   const handlePhotosChange = (catIndex: number, itemIndex: number, photos: string[]) => {
-    const newExpenses = [...formData.expenses];
+    const newExpenses = [...expenses];
     newExpenses[catIndex].items[itemIndex].billPhotos = photos;
     setFormData({ ...formData, expenses: newExpenses });
   };
   
-  const openAddItemModal = (catIndex: number) => {
-    setNewItem({ name: '', categoryIndex: catIndex, saveForFuture: false });
-    setAddItemModalOpen(true);
-  };
-
   const handleAddNewItem = () => {
-    if (!newItem.name.trim()) {
-        alert("Item name cannot be empty.");
-        return;
-    }
-    const newExpenses = [...formData.expenses];
+    if (!newItem.name.trim()) { alert("Item name cannot be empty."); return; }
+    const newExpenses = [...expenses];
     const category = newExpenses[newItem.categoryIndex];
-    
     if(category.items.some(item => item.name.toLowerCase() === newItem.name.trim().toLowerCase())) {
-        alert("This item already exists in the category.");
-        return;
+        alert("This item already exists in the category."); return;
     }
-
     category.items.push({ id: uuidv4(), name: newItem.name.trim(), amount: 0, billPhotos: [] });
     setFormData({ ...formData, expenses: newExpenses });
-
     if (newItem.saveForFuture) {
-        onSaveCustomItem(category.name, newItem.name.trim());
+        handleSaveCustomItem(category.name, newItem.name.trim(), newItem.defaultValue || 0);
     }
     setAddItemModalOpen(false);
   };
@@ -125,104 +143,115 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
   const confirmRemoveExpenseItem = () => {
     if (deleteConfirmation) {
         const { catIndex, itemIndex } = deleteConfirmation;
-        const newExpenses = [...formData.expenses];
+        const newExpenses = [...expenses];
         newExpenses[catIndex].items.splice(itemIndex, 1);
         setFormData({ ...formData, expenses: newExpenses });
         setDeleteConfirmation(null);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.date) {
-      alert('Please select a date.');
-      return;
-    }
-    if (dateError && !record) {
-      alert(dateError);
-      return;
-    }
-    onSave(formData);
+    if (!formData.date) { alert('Please select a date.'); return; }
+    if (dateError) { alert(dateError); return; }
+    await handleSave(formData);
+    navigate(`/records/${formData.id}`);
   };
 
   const toggleCategory = (categoryName: string) => {
-    const isOpening = openCategory !== categoryName;
-    const newOpenCategory = isOpening ? categoryName : null;
+    const newOpenCategory = openCategory !== categoryName ? categoryName : null;
     setOpenCategory(newOpenCategory);
+    if (newOpenCategory) localStorage.setItem('ayshas-last-open-category', newOpenCategory);
+    else localStorage.removeItem('ayshas-last-open-category');
+  };
 
-    if (newOpenCategory) {
-        localStorage.setItem('ayshas-last-open-category', newOpenCategory);
-        setTimeout(() => {
-            categoryRefs.current[categoryName]?.scrollIntoView({ behavior: 'smooth' });
-        }, 100); // Delay to allow accordion to open
-    } else {
-        localStorage.removeItem('ayshas-last-open-category');
-    }
+  const goToNextCategory = (currentIndex: number) => {
+    const nextIndex = (currentIndex + 1) % expenses.length;
+    const nextCategoryName = expenses[nextIndex].name;
+    setOpenCategory(nextCategoryName);
+    setTimeout(() => {
+        const categoryElement = categoryRefs.current[nextCategoryName];
+        if (categoryElement) {
+            // First, scroll the category into view. The 'center' block alignment is good.
+            categoryElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // After scrolling, find the first visible input field and focus it.
+            const firstInput = categoryElement.querySelector('input[type="number"]') as HTMLInputElement | null;
+            if (firstInput) {
+                firstInput.focus();
+                firstInput.select(); // Select text for easy replacement.
+            }
+        }
+    }, 150); // A small delay to allow the accordion to open.
   };
 
   const inputStyles = "w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pb-24">
-      {/* Date and Sales */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div>
             <label htmlFor="date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date</label>
-            <input
-              type="date"
-              id="date"
-              name="date"
-              value={formData.date}
-              onChange={handleInputChange}
-              className={inputStyles}
-            />
+            <input type="date" id="date" name="date" value={formData.date} onChange={handleInputChange} className={inputStyles} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="morningSales" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Morning Sales</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
+              <input type="text" inputMode="decimal" id="morningSales" name="morningSales" value={morningSales === 0 ? '' : morningSales} onChange={handleInputChange} className={`${inputStyles} pl-7`} placeholder="0" />
+            </div>
           </div>
           <div>
             <label htmlFor="totalSales" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Sales</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                id="totalSales"
-                name="totalSales"
-                value={formData.totalSales === 0 ? '' : formData.totalSales}
-                onChange={handleInputChange}
-                className={`${inputStyles} pl-7`}
-                placeholder="Can be added later"
-              />
+              <input type="text" inputMode="decimal" id="totalSales" name="totalSales" value={totalSales === 0 ? '' : totalSales} onChange={handleInputChange} className={`${inputStyles} pl-7`} placeholder="Morning + Night"/>
+            </div>
+          </div>
+           <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Night Sales</label>
+            <div className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <span className="text-slate-500 dark:text-slate-400 mr-1">₹</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{nightSales.toLocaleString('en-IN')}</span>
             </div>
           </div>
         </div>
-        {dateError && <p className="text-sm text-amber-600 col-span-2">{dateError}</p>}
+        {nightSales < 0 && (
+            <div className="flex items-start p-3 text-sm bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-yellow-800 dark:text-yellow-300">
+                <WarningIcon className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+                <span>Morning Sales should not be greater than Total Sales. Please check your inputs.</span>
+            </div>
+        )}
+        {dateError && (
+            <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <p className="text-sm text-red-700 dark:text-red-400 font-medium">{dateError}</p>
+                <button type="button" onClick={() => navigate(`/records/${formData.date}`)} className="ml-4 px-3 py-1 text-sm font-semibold text-white bg-primary rounded-md hover:bg-primary/80 transition-colors flex-shrink-0">View Existing</button>
+            </div>
+        )}
       </div>
 
-      {/* Expenses */}
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100 px-1">Expenses</h3>
-        {formData.expenses.map((category, catIndex) => {
+        {expenses.map((category, catIndex) => {
           const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
           const isOpen = openCategory === category.name;
           return (
-            <div key={category.id} ref={el => { if (el) categoryRefs.current[category.name] = el }} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden transition-all duration-300">
-              <button
-                type="button"
-                onClick={() => toggleCategory(category.name)}
-                className="w-full flex justify-between items-center p-4 text-left"
-                aria-expanded={isOpen}
-              >
+            <div 
+                key={category.id} 
+                ref={el => { if (el) categoryRefs.current[category.name] = el }} 
+                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden transition-all duration-300"
+            >
+              <button type="button" onClick={() => toggleCategory(category.name)} className="w-full flex justify-between items-center p-4 text-left" aria-expanded={isOpen}>
                 <div>
                   <h4 className="text-lg font-semibold text-primary">{category.name}</h4>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Total: ₹{categoryTotal.toLocaleString('en-IN')}</p>
                 </div>
-                <div className={`transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-                    <ChevronDownIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />
-                </div>
+                <ChevronDownIcon className={`w-6 h-6 text-slate-500 dark:text-slate-400 transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
               </button>
-              {isOpen && (
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-                  <div className="space-y-4">
+              <div className={`transition-[max-height] duration-500 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px]' : 'max-h-0'}`}>
+                <div className="px-4 pb-4 border-t border-slate-200 dark:border-slate-800">
+                  <div className="space-y-4 pt-4">
                     {category.items.map((item, itemIndex) => (
                       <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3">
                         <label htmlFor={`${category.id}-${item.id}`} className="text-slate-700 dark:text-slate-300 font-medium pr-2 truncate">{item.name}</label>
@@ -232,44 +261,36 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                         <div className="col-span-2">
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
-                                <input
-                                type="number"
-                                step="0.01"
-                                id={`${category.id}-${item.id}`}
-                                value={item.amount === 0 ? '' : item.amount}
-                                onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)}
-                                className={`${inputStyles} pl-7 pr-2 py-1.5`}
-                                placeholder="0"
-                                />
+                                <input type="number" step="0.01" id={`${category.id}-${item.id}`} value={item.amount === 0 ? '' : item.amount} onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)} className={`${inputStyles} pl-7 pr-2 py-1.5`} placeholder="0" />
                             </div>
-                            {category.name === 'Market Bills' && (
-                              <ImageUpload 
-                                  billPhotos={item.billPhotos}
-                                  onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} 
-                              />
+                            {CATEGORIES_WITH_BILL_UPLOAD.includes(category.name) && (
+                              <ImageUpload billPhotos={item.billPhotos} onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} />
                             )}
                         </div>
                       </div>
                     ))}
-                    <button type="button" onClick={() => openAddItemModal(catIndex)} className="mt-2 flex items-center text-sm font-medium text-secondary hover:text-primary">
-                      <PlusIcon className="w-4 h-4 mr-1"/>
-                      Add New Item
+                    <button type="button" onClick={() => { setNewItem({ name: '', categoryIndex: catIndex, saveForFuture: false, defaultValue: 0 }); setAddItemModalOpen(true); }} className="mt-2 flex items-center text-sm font-medium text-secondary hover:text-primary">
+                      <PlusIcon className="w-4 h-4 mr-1"/> Add New Item
+                    </button>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+                    <button type="button" onClick={() => goToNextCategory(catIndex)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        Next Category
                     </button>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
       </div>
       
-      {/* Sticky Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-40 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 py-3">
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                 <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Sales</p>
-                    <p className="font-bold text-primary truncate">₹{(formData.totalSales || 0).toLocaleString('en-IN')}</p>
+                    <p className="font-bold text-primary truncate">₹{(totalSales || 0).toLocaleString('en-IN')}</p>
                 </div>
                 <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Expenses</p>
@@ -281,8 +302,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                 </div>
             </div>
           <div className="flex justify-end items-center space-x-3">
-            <button type="button" onClick={onCancel} className="px-5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-            <button type="submit" className="px-5 py-2.5 bg-secondary text-white rounded-lg text-sm font-semibold hover:bg-primary shadow-sm transition-colors">Save Record</button>
+            <button type="button" onClick={() => navigate(-1)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+            <button type="submit" disabled={!!dateError} className="px-5 py-2.5 bg-secondary text-white rounded-lg text-sm font-semibold hover:bg-primary shadow-sm transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed">Save Record</button>
           </div>
         </div>
       </div>
@@ -294,25 +315,21 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                 <div className="space-y-4">
                     <div>
                         <label htmlFor="newItemName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Item Name</label>
-                        <input
-                            type="text"
-                            id="newItemName"
-                            value={newItem.name}
-                            onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                            className={inputStyles}
-                            placeholder="e.g., New Supplier"
-                        />
+                        <input type="text" id="newItemName" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className={inputStyles} placeholder="e.g., New Supplier"/>
                     </div>
                     <div className="flex items-center">
-                        <input
-                            id="saveForFuture"
-                            type="checkbox"
-                            checked={newItem.saveForFuture}
-                            onChange={(e) => setNewItem({...newItem, saveForFuture: e.target.checked})}
-                            className="h-4 w-4 text-primary border-slate-300 rounded focus:ring-primary dark:bg-slate-700 dark:border-slate-600"
-                        />
+                        <input id="saveForFuture" type="checkbox" checked={newItem.saveForFuture} onChange={(e) => setNewItem({...newItem, saveForFuture: e.target.checked})} className="h-4 w-4 text-primary border-slate-300 rounded focus:ring-primary dark:bg-slate-700 dark:border-slate-600"/>
                         <label htmlFor="saveForFuture" className="ml-2 block text-sm text-slate-900 dark:text-slate-300">Save this item for future entries</label>
                     </div>
+                    {newItem.saveForFuture && (
+                       <div>
+                         <label htmlFor="defaultValue" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Default Pre-fill Amount</label>
+                         <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
+                            <input type="number" id="defaultValue" value={newItem.defaultValue === 0 ? '' : newItem.defaultValue} onChange={(e) => setNewItem({...newItem, defaultValue: parseFloat(e.target.value) || 0})} className={`${inputStyles} pl-7`} placeholder="0"/>
+                         </div>
+                       </div>
+                    )}
                 </div>
                 <div className="mt-6 flex justify-end space-x-3">
                     <button type="button" onClick={() => setAddItemModalOpen(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button>
@@ -329,9 +346,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ record, onSave, onCancel, allRe
                     <WarningIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
                 <h3 className="text-xl font-bold mt-4 mb-2 dark:text-slate-100">Confirm Deletion</h3>
-                <p className="text-slate-600 dark:text-slate-300 mb-6">
-                    Are you sure you want to permanently delete the item: <br/> <span className="font-semibold text-slate-800 dark:text-slate-100">{deleteConfirmation.itemName}</span>?
-                </p>
+                <p className="text-slate-600 dark:text-slate-300 mb-6">Are you sure you want to permanently delete the item: <br/> <span className="font-semibold text-slate-800 dark:text-slate-100">{deleteConfirmation.itemName}</span>?</p>
                 <div className="flex justify-center space-x-4">
                     <button type="button" onClick={() => setDeleteConfirmation(null)} className="px-5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
                     <button type="button" onClick={confirmRemoveExpenseItem} className="px-5 py-2.5 bg-error text-white rounded-lg text-sm font-semibold hover:bg-red-700 shadow-sm transition-colors">Delete Item</button>

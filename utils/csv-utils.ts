@@ -9,6 +9,9 @@ const escapeCsvField = (field: any): string => {
 };
 
 const calculateTotalExpenses = (record: DailyRecord): number => {
+    if (!record || !record.expenses) {
+        return 0;
+    }
     return record.expenses.reduce((total, category) => 
         total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 
     0);
@@ -22,6 +25,8 @@ export const convertToCSV = (records: DailyRecord[]): string => {
     const headers = [
         'Date',
         'Total Sales',
+        'Morning Sales',
+        'Night Sales',
         'Total Expenses',
         'Profit/Loss',
         'Expense Category',
@@ -36,6 +41,8 @@ export const convertToCSV = (records: DailyRecord[]): string => {
     sortedRecords.forEach(record => {
         const totalExpenses = calculateTotalExpenses(record);
         const profit = record.totalSales - totalExpenses;
+        const morningSales = record.morningSales || 0;
+        const nightSales = record.totalSales - morningSales;
 
         const hasExpenses = record.expenses.some(cat => cat.items.length > 0);
 
@@ -44,6 +51,8 @@ export const convertToCSV = (records: DailyRecord[]): string => {
             const row = [
                 record.date,
                 record.totalSales,
+                morningSales,
+                nightSales,
                 totalExpenses,
                 profit,
                 '', // Expense Category
@@ -63,6 +72,8 @@ export const convertToCSV = (records: DailyRecord[]): string => {
                     const row = [
                         record.date,
                         record.totalSales,
+                        morningSales,
+                        nightSales,
                         totalExpenses,
                         profit,
                         category.name,

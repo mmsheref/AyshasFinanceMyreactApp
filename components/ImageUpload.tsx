@@ -76,6 +76,15 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
     setViewingIndex(nextIndex);
   }
 
+  const handlePrimaryClick = () => {
+    // If there are no photos, open file picker directly. Otherwise, open the manager.
+    if (billPhotos.length === 0) {
+      handleAddClick();
+    } else {
+      setIsManagerOpen(true);
+    }
+  };
+
   return (
     <>
       <input
@@ -89,7 +98,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
       {/* Compact button in the form */}
       <button
         type="button"
-        onClick={() => setIsManagerOpen(true)}
+        onClick={handlePrimaryClick}
         className={`w-full mt-2 text-sm font-medium p-2 rounded-lg flex items-center justify-center transition-colors ${
           billPhotos.length > 0
             ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60'
