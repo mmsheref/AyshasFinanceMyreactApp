@@ -18,16 +18,20 @@ const CategoryCard: React.FC<{ category: ExpenseCategory }> = ({ category }) => 
 
     if (itemsWithAmount.length === 0) return null;
 
+    // Use `break-inside-avoid` to prevent the card from splitting across columns.
+    // Added `mb-4` for vertical spacing between cards.
     return (
-        <div className="break-inside-avoid-column">
+        <div className="break-inside-avoid mb-4">
             <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-2 rounded-t-md flex justify-between">
-                <span className="truncate pr-2">{category.name}</span>
+                {/* Removed truncate to allow wrapping */}
+                <span className="pr-2">{category.name}</span>
                 <span>₹{categoryTotal.toLocaleString('en-IN')}</span>
             </h4>
             <ul className="border border-t-0 border-slate-200 dark:border-slate-700 rounded-b-md">
                 {itemsWithAmount.map((item, index) => (
                     <li key={item.id} className={`px-2 py-1 flex justify-between items-center text-xs ${index < itemsWithAmount.length - 1 ? 'border-b border-slate-100 dark:border-slate-700/50' : ''}`}>
-                        <span className="text-slate-700 dark:text-slate-300 truncate pr-2">{item.name}</span>
+                        {/* Removed truncate and added break-words for long item names */}
+                        <span className="text-slate-700 dark:text-slate-300 pr-2 break-words">{item.name}</span>
                         <span className="font-medium text-slate-800 dark:text-slate-100 flex-shrink-0">₹{item.amount.toLocaleString('en-IN')}</span>
                     </li>
                 ))}
@@ -46,36 +50,9 @@ const ShareableReport: React.FC<ShareableReportProps> = ({ record, id }) => {
     category.items.reduce((sum, item) => sum + item.amount, 0) > 0
   );
   
-  let leftColumnCategories: ExpenseCategory[] = [];
-  let rightColumnCategories: ExpenseCategory[] = [];
-
-  // Always use the balancing logic.
-  let leftColumnHeight = 0;
-  let rightColumnHeight = 0;
-  
-  const getCategoryHeight = (category: ExpenseCategory) => {
-      const headerHeight = 36; // Approx height for padding and header text
-      const itemHeight = 22;   // Approx height for each item row
-      const itemsWithAmount = category.items.filter(item => item.amount > 0).length;
-      const bottomMargin = 12; // Accounts for space-y-3
-      return headerHeight + (itemsWithAmount * itemHeight) + bottomMargin;
-  };
-
-  categoriesWithExpenses.forEach(category => {
-      const categoryHeight = getCategoryHeight(category);
-      if (leftColumnHeight <= rightColumnHeight) {
-          leftColumnCategories.push(category);
-          leftColumnHeight += categoryHeight;
-      } else {
-          rightColumnCategories.push(category);
-          rightColumnHeight += categoryHeight;
-      }
-  });
-
-  const hasContentInRightColumn = rightColumnCategories.length > 0;
-
   return (
-    <div id={id} className="p-6 bg-white dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100" style={{ width: hasContentInRightColumn ? '650px' : '400px' }}>
+    // Set a fixed width for consistent rendering.
+    <div id={id} className="p-6 bg-white dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100" style={{ width: '680px' }}>
       <div className="text-center pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
         <h1 className="text-xl font-bold text-primary">Aysha's P&L Report</h1>
         <p className="text-md text-slate-600 dark:text-slate-300 mt-1">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -103,20 +80,12 @@ const ShareableReport: React.FC<ShareableReportProps> = ({ record, id }) => {
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 text-center mb-3">Expense Breakdown</h3>
-        <div className="flex align-top space-x-4">
-            <div className={`${hasContentInRightColumn ? 'w-1/2' : 'w-full'} space-y-3`}>
-              {leftColumnCategories.map(category => (
-                <CategoryCard key={category.id} category={category} />
-              ))}
-            </div>
-            {hasContentInRightColumn && (
-                <div className="w-1/2 space-y-3">
-                  {rightColumnCategories.map(category => (
-                    <CategoryCard key={category.id} category={category} />
-                  ))}
-                </div>
-            )}
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 text-center mb-4">Expense Breakdown</h3>
+        {/* Replaced complex JS-based column balancing with a simple and robust CSS column layout */}
+        <div className="text-left" style={{ columnCount: 2, columnGap: '1rem' }}>
+          {categoriesWithExpenses.map(category => (
+            <CategoryCard key={category.id} category={category} />
+          ))}
         </div>
       </div>
 
