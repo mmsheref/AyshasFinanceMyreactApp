@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom';
-import { PlusIcon, HomeIcon, ListIcon, BackIcon, SettingsIcon } from './Icons';
+import { PlusIcon, HomeIcon, ListIcon, BackIcon, SettingsIcon, ChartBarIcon } from './Icons';
 
 const Layout: React.FC = () => {
     const location = useLocation();
@@ -14,11 +14,13 @@ const Layout: React.FC = () => {
         if (path.startsWith('/records/')) return 'Record Details';
         if (path === '/records') return 'All Records';
         if (path === '/settings') return 'Settings';
+        if (path === '/reports') return 'Reports';
         return "Aysha's P&L";
     };
 
     const isFormPage = location.pathname.includes('/new') || location.pathname.includes('/edit');
-    const showBackButton = location.pathname !== '/' && location.pathname !== '/records';
+    const isRootPage = ['/', '/records', '/reports', '/settings'].includes(location.pathname);
+    const showBackButton = !isRootPage;
     const showBottomNav = !isFormPage;
 
     const handleBack = () => navigate(-1);
@@ -61,7 +63,7 @@ const Layout: React.FC = () => {
             {/* Bottom Navigation */}
             {showBottomNav && (
                 <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-30 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
-                    <div className="container mx-auto h-16 grid grid-cols-3 items-center">
+                    <div className="container mx-auto h-16 grid grid-cols-4 items-center">
                         <NavLink to="/" className={navLinkClass} aria-label="Dashboard">
                             <HomeIcon className="w-6 h-6 mb-1" />
                             <span className="text-xs font-medium">Dashboard</span>
@@ -69,6 +71,10 @@ const Layout: React.FC = () => {
                         <NavLink to="/records" className={navLinkClass} aria-label="Records">
                             <ListIcon className="w-6 h-6 mb-1" />
                             <span className="text-xs font-medium">Records</span>
+                        </NavLink>
+                         <NavLink to="/reports" className={navLinkClass} aria-label="Reports">
+                            <ChartBarIcon className="w-6 h-6 mb-1" />
+                            <span className="text-xs font-medium">Reports</span>
                         </NavLink>
                         <NavLink to="/settings" className={navLinkClass} aria-label="Settings">
                             <SettingsIcon className="w-6 h-6 mb-1" />
@@ -78,7 +84,7 @@ const Layout: React.FC = () => {
                 </nav>
             )}
 
-            {['/', '/records'].includes(location.pathname) && (
+            {['/', '/records', '/reports'].includes(location.pathname) && (
                 <div className="fixed bottom-[calc(5rem)] left-1/2 -translate-x-1/2 z-40 pb-[env(safe-area-inset-bottom)]">
                     <button
                         onClick={() => navigate('/records/new')}

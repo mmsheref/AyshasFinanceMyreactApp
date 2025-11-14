@@ -253,7 +253,8 @@ const RecordForm: React.FC = () => {
     setTimeout(() => {
         const categoryElement = categoryRefs.current[nextCategoryName];
         if (categoryElement) {
-            const firstInput = categoryElement.querySelector('input[type="number"]') as HTMLInputElement | null;
+            // FIX: Specify HTMLInputElement as the type for querySelector to ensure correct type inference.
+            const firstInput = categoryElement.querySelector<HTMLInputElement>('input[type="number"]');
             if (firstInput) {
                 firstInput.focus();
                 firstInput.select(); // Select text for easy replacement.

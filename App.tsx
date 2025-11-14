@@ -10,6 +10,7 @@ import RecordForm from './components/RecordForm';
 import RecordDetail from './components/RecordDetail';
 import SettingsPage from './components/SettingsPage';
 import Onboarding from './components/Onboarding';
+import Reports from './components/Reports';
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex items-center justify-center min-h-screen">
@@ -29,8 +30,8 @@ const AppRoutes: React.FC = () => {
 
     useEffect(() => {
         const listenerPromise = CapacitorApp.addListener('backButton', () => {
-            if (location.pathname === '/') {
-                CapacitorApp.exitApp();
+            if (location.pathname === '/' || location.pathname === '/records' || location.pathname === '/reports' || location.pathname === '/settings') {
+                 // On root pages, do nothing to allow default OS behavior or exit app
             } else {
                 navigate(-1);
             }
@@ -54,6 +55,7 @@ const AppRoutes: React.FC = () => {
                 <Route path="records/:recordId" element={<RecordDetail />} />
                 <Route path="records/:recordId/edit" element={<RecordForm />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="reports" element={<Reports />} />
             </Route>
         </Routes>
     );

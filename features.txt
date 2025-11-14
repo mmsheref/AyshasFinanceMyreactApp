@@ -1,6 +1,12 @@
 - Dashboard with key metrics (7-day and 30-day average profit)
 - Profit/Loss trend chart for the last 30 entries
 - List of recent financial records on the dashboard
+- Reports page with advanced analytics:
+  - Date filtering (This Week, This Month, Custom Range, etc.)
+  - KPI summaries (Total Profit, Profit Margin, Average Profit)
+  - Expense breakdown by category with a donut chart
+  - Top 5 individual expense items
+  - Morning vs. Night sales analysis
 - Create, Read, Update, and Delete (CRUD) operations for daily records
 - Date-based record identification
 - Detailed expense tracking with customizable categories

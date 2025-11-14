@@ -5,6 +5,10 @@ Aysha's P&L Dashboard is a comprehensive, mobile-first web application designed 
 ## Key Features
 
 *   **At-a-Glance Dashboard**: A comprehensive overview of your financial health, including key metrics like 7-day and 30-day average profit, total profit, and recent activity.
+*   **In-Depth Reports Page**: A dedicated section for deep financial analysis with powerful date filtering.
+    *   **KPI Summary**: View total sales, expenses, net profit, profit margin, and average daily profit for any period.
+    *   **Expense Analysis**: A visual donut chart and list break down expenses by category, while a "Top 5" list identifies your biggest individual costs.
+    *   **Sales Insights**: Compare morning vs. night sales performance and analyze daily trends.
 *   **Advanced Data Visualization**:
     *   **Profit/Loss Trend Chart**: A bar chart visualizing profit and loss over time.
     *   **Sales Trend Chart**: A stacked bar chart breaking down morning vs. night sales.
