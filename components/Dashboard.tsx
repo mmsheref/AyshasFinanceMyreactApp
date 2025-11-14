@@ -16,12 +16,17 @@ const Dashboard: React.FC = () => {
   const [isDateRangePickerOpen, setIsDateRangePickerOpen] = useState(false);
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
 
+  const finishedRecords = useMemo(() => {
+    return records.filter(record => record.totalSales > 0);
+  }, [records]);
+
+
   const {
     avg7DayProfit,
     avg30DayProfit,
     totalProfitAllTime
   } = useMemo(() => {
-    const recordsWithProfit = records.map(r => ({
+    const recordsWithProfit = finishedRecords.map(r => ({
       ...r,
       profit: (r.totalSales || 0) - calculateTotalExpenses(r),
       dateObj: new Date(r.date + 'T00:00:00')
@@ -50,11 +55,11 @@ const Dashboard: React.FC = () => {
       avg30DayProfit: recordsLast30Days.length > 0 ? total30DayProfit / recordsLast30Days.length : 0,
       totalProfitAllTime: totalProfitAllTime,
     };
-  }, [records]);
+  }, [finishedRecords]);
   
   const filteredRecordsForCharts = useMemo(() => {
       // records are sorted descending, reverse to get ascending for charts
-      const ascendingRecords = [...records].reverse(); 
+      const ascendingRecords = [...finishedRecords].reverse(); 
       
       if (activeFilter === 'ALL') {
           return ascendingRecords;
@@ -87,7 +92,7 @@ const Dashboard: React.FC = () => {
           const recordDate = new Date(record.date + 'T00:00:00');
           return recordDate >= startDate && recordDate <= now;
       });
-  }, [records, activeFilter, dateRange]);
+  }, [finishedRecords, activeFilter, dateRange]);
 
   const chartData = useMemo(() => {
     return filteredRecordsForCharts.map(r => {
@@ -202,7 +207,7 @@ const Dashboard: React.FC = () => {
                 <ProfitCard 
                     value={totalProfitAllTime} 
                     label="Total Profit" 
-                    subLabel={`Across ${records.length} records`}
+                    subLabel={`Across ${finishedRecords.length} records`}
                 />
             </div>
         </div>
@@ -287,9 +292,15 @@ const Dashboard: React.FC = () => {
                                 <p className="font-semibold text-slate-800 dark:text-slate-100">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long' })}</p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
                             </div>
-                             <p className={`font-bold text-lg text-right ml-2 ${profit >= 0 ? 'text-success' : 'text-error'}`}>
-                                {profit >= 0 ? '+' : ''}₹{Math.abs(profit).toLocaleString('en-IN')}
-                            </p>
+                            {record.totalSales === 0 ? (
+                                <div className="text-right ml-2">
+                                    <span className="inline-block px-2 py-1 text-xs font-semibold text-amber-800 bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 rounded-full">In Progress</span>
+                                </div>
+                              ) : (
+                                <p className={`font-bold text-lg text-right ml-2 ${profit >= 0 ? 'text-success' : 'text-error'}`}>
+                                    {profit >= 0 ? '+' : ''}₹{Math.abs(profit).toLocaleString('en-IN')}
+                                </p>
+                            )}
                         </li>
                     )
                 })}

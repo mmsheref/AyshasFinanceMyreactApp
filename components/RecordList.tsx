@@ -11,6 +11,23 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => v
     const profit = record.totalSales - totalExpenses;
     const profitColor = profit >= 0 ? 'text-success' : 'text-error';
 
+    const profitOrStatus = record.totalSales === 0 ? (
+        <>
+            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                In Progress
+            </p>
+            <p className="text-xs text-slate-400">Enter sales to complete</p>
+        </>
+    ) : (
+        <>
+            <p className={`text-xl font-bold ${profitColor}`}>
+                {profit >= 0 ? '+' : '-'}₹{Math.abs(profit).toLocaleString('en-IN')}
+            </p>
+            <p className="text-xs text-slate-400">Net Profit</p>
+        </>
+    );
+
+
     return (
         <div 
             onClick={() => onView(record.id)}
@@ -22,10 +39,7 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => v
                     <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric' })}</p>
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
-                    <p className={`text-xl font-bold ${profitColor}`}>
-                        {profit >= 0 ? '+' : '-'}₹{Math.abs(profit).toLocaleString('en-IN')}
-                    </p>
-                    <p className="text-xs text-slate-400">Net Profit</p>
+                    {profitOrStatus}
                 </div>
             </div>
             <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-3">

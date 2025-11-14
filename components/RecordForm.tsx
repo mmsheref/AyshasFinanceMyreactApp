@@ -33,6 +33,7 @@ const RecordForm: React.FC = () => {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{catIndex: number, itemIndex: number, itemName: string} | null>(null);
   const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const footerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initializeForm = () => {
@@ -201,6 +202,49 @@ const RecordForm: React.FC = () => {
     if (newOpenCategory) localStorage.setItem('ayshas-last-open-category', newOpenCategory);
     else localStorage.removeItem('ayshas-last-open-category');
   };
+  
+  const scrollInputIntoView = (inputElement: HTMLInputElement) => {
+    if (!inputElement) return;
+
+    // We use requestAnimationFrame to run our check after the browser has handled
+    // the focus event and performed its own default scrolling. This is more reliable
+    // than a fixed-duration setTimeout.
+    requestAnimationFrame(() => {
+        const footer = footerRef.current;
+        const header = document.querySelector('header');
+
+        if (!footer || !header) return;
+
+        const footerHeight = footer.offsetHeight;
+        const headerHeight = header.offsetHeight;
+        const inputRect = inputElement.getBoundingClientRect();
+        
+        // Add a 20px buffer to ensure the input is not right at the edge.
+        const PADDING = 20; 
+
+        let scrollAdjustment = 0;
+
+        // Check if the input is obscured by the bottom sticky footer
+        if (inputRect.bottom > (window.innerHeight - footerHeight)) {
+            // The amount the input is obscured by. We need to scroll down by this amount.
+            // A positive value for window.scrollBy scrolls the page down, moving the content up.
+            scrollAdjustment = inputRect.bottom - (window.innerHeight - footerHeight) + PADDING;
+        } 
+        // Check if the input is obscured by the top sticky header
+        else if (inputRect.top < headerHeight) {
+            // The amount the input is obscured by. We need to scroll up by this amount.
+            // A negative value for window.scrollBy scrolls the page up, moving the content down.
+            scrollAdjustment = inputRect.top - headerHeight - PADDING;
+        }
+
+        if (scrollAdjustment !== 0) {
+            window.scrollBy({
+                top: scrollAdjustment,
+                behavior: 'smooth'
+            });
+        }
+    });
+  };
 
   const goToNextCategory = (currentIndex: number) => {
     const nextIndex = (currentIndex + 1) % expenses.length;
@@ -209,18 +253,42 @@ const RecordForm: React.FC = () => {
     setTimeout(() => {
         const categoryElement = categoryRefs.current[nextCategoryName];
         if (categoryElement) {
-            // First, scroll the category into view. The 'center' block alignment is good.
-            categoryElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            // After scrolling, find the first visible input field and focus it.
             const firstInput = categoryElement.querySelector('input[type="number"]') as HTMLInputElement | null;
             if (firstInput) {
                 firstInput.focus();
                 firstInput.select(); // Select text for easy replacement.
+                scrollInputIntoView(firstInput);
             }
         }
     }, 150); // A small delay to allow the accordion to open.
   };
+
+  const handleExpenseKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, catIndex: number, itemIndex: number) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+
+    const category = expenses[catIndex];
+    const categoryElement = categoryRefs.current[category.name];
+    if (!categoryElement) return;
+
+    const inputs = Array.from(
+        categoryElement.querySelectorAll<HTMLInputElement>('input[type="number"]')
+    );
+    
+    // The `itemIndex` passed is the index in the `category.items` array.
+    // This should correspond to the index in the `inputs` querySelectorAll result.
+    const currentInputIndex = itemIndex;
+
+    if (currentInputIndex < inputs.length - 1) {
+        const nextInput = inputs[currentInputIndex + 1];
+        nextInput.focus();
+        nextInput.select();
+        scrollInputIntoView(nextInput);
+    } else {
+        goToNextCategory(catIndex);
+    }
+  };
+
 
   const inputStyles = "w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition";
 
@@ -298,7 +366,16 @@ const RecordForm: React.FC = () => {
                         <div className="col-span-2">
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 dark:text-slate-400 pointer-events-none">₹</span>
-                                <input type="number" step="0.01" id={`${category.id}-${item.id}`} value={item.amount === 0 ? '' : item.amount} onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)} className={`${inputStyles} pl-7 pr-2 py-1.5`} placeholder="0" />
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    id={`${category.id}-${item.id}`} 
+                                    value={item.amount === 0 ? '' : item.amount} 
+                                    onChange={(e) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)} 
+                                    onKeyDown={(e) => handleExpenseKeyDown(e, catIndex, itemIndex)}
+                                    className={`${inputStyles} pl-7 pr-2 py-1.5`} 
+                                    placeholder="0" 
+                                />
                             </div>
                             {CATEGORIES_WITH_BILL_UPLOAD.includes(category.name) && (
                               <ImageUpload billPhotos={item.billPhotos} onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} />
@@ -329,7 +406,7 @@ const RecordForm: React.FC = () => {
         </button>
       </div>
       
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-40 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
+      <div ref={footerRef} className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-40 border-t border-slate-200/80 dark:border-slate-800/80 pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 py-3">
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                 <div>
