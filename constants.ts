@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ExpenseCategory, CustomExpenseStructure } from './types';
+import { ExpenseCategory, CustomExpenseStructure, ReportMetric } from './types';
 
 /**
  * Defines which expense categories should show the "Add Bill Photo" button.
@@ -95,4 +95,22 @@ export const generateNewRecordExpenses = (customStructure: CustomExpenseStructur
             amount: item.defaultValue || 0, // Use default value, fallback to 0
         }))
     }));
+};
+
+/**
+ * A map of report metric keys to their user-friendly display names.
+ */
+export const METRIC_LABELS: Record<ReportMetric, string> = {
+    NET_PROFIT: 'Net Profit',
+    PROFIT_MARGIN: 'Profit Margin',
+    PRIME_COST: 'Prime Cost %',
+    TOTAL_SALES: 'Total Sales',
+    TOTAL_EXPENSES: 'Total Expenses',
+    FOOD_COST: 'Food Cost %',
+    LABOR_COST: 'Labor Cost %',
+    AVG_DAILY_SALES: 'Avg. Daily Sales',
+    AVG_DAILY_PROFIT: 'Avg. Daily Profit',
+    BUSIEST_DAY: 'Busiest Day (Sales)',
+    MOST_PROFITABLE_DAY: 'Most Profitable Day',
+    LEAST_PROFITABLE_DAY: 'Least Profitable Day',
 };

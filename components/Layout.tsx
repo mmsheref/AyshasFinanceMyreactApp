@@ -33,20 +33,20 @@ const Layout: React.FC = () => {
     return (
         <div className="min-h-screen text-slate-800 dark:text-slate-200 font-sans flex flex-col">
             {/* Header */}
-            <header className="bg-primary text-white sticky top-0 z-20 pt-[env(safe-area-inset-top)] dark:border-b dark:border-slate-800">
-                <div className="container mx-auto px-4 h-16 flex justify-between items-center">
-                    <div className="flex items-center w-1/3">
-                        {showBackButton ? (
-                            <button onClick={handleBack} className="p-2 -ml-2 mr-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Go back">
+            <header className="bg-primary text-white sticky top-0 z-20 pt-[env(safe-area-inset-top)] shadow-md">
+                <div className="container mx-auto px-4 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
+                    <div className="flex">
+                        {showBackButton && (
+                            <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-white/20" aria-label="Go back">
                                 <BackIcon className="w-6 h-6" />
                             </button>
-                        ) : null}
+                        )}
                     </div>
-                    <h1 className="text-xl font-bold tracking-tight text-center w-1/3 truncate">
+                    <h1 className="text-xl font-bold tracking-tight text-center truncate px-2">
                         {getHeaderText()}
                     </h1>
-                    <div className="flex items-center justify-end w-1/3">
-                        {/* Placeholder for potential future icons */}
+                    <div className="flex justify-end">
+                        {/* Right side content placeholder */}
                     </div>
                 </div>
             </header>

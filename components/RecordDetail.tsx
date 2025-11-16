@@ -96,6 +96,16 @@ const RecordDetail: React.FC = () => {
     setViewingPhotos(photos);
     setCurrentPhotoIndex(startIndex);
   };
+
+  const handlePhotoNavigation = (direction: 'next' | 'prev') => {
+    if (!viewingPhotos) return;
+    
+    setCurrentPhotoIndex(prevIndex => {
+      const change = direction === 'next' ? 1 : -1;
+      // This is the correct and safe way to handle modulo for both positive and negative results
+      return (prevIndex + change + viewingPhotos.length) % viewingPhotos.length;
+    });
+  };
   
   return (
     <div className="space-y-6">
@@ -189,14 +199,14 @@ const RecordDetail: React.FC = () => {
                 {viewingPhotos.length > 1 && (
                     <>
                         <button 
-                            onClick={() => setCurrentPhotoIndex((prev) => (prev - 1 + viewingPhotos.length) % viewingPhotos.length)} 
+                            onClick={() => handlePhotoNavigation('prev')}
                             className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-2 rounded-full hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
                             aria-label="Previous image"
                         >
                             <ChevronLeftIcon className="w-6 h-6" />
                         </button>
                         <button 
-                            onClick={() => setCurrentPhotoIndex((prev) => (prev + 1) % viewingPhotos.length)} 
+                            onClick={() => handlePhotoNavigation('next')}
                             className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-2 rounded-full hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
                             aria-label="Next image"
                         >

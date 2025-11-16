@@ -5,6 +5,7 @@ import SalesChart from './SalesChart';
 import { useAppContext } from '../context/AppContext';
 import { calculateTotalExpenses } from '../utils/record-utils';
 import DateRangePicker from './DateRangePicker';
+import { SparklesIcon } from './Icons';
 
 type FilterValue = '7D' | '30D' | '90D' | 'ALL' | 'CUSTOM';
 
@@ -125,6 +126,9 @@ const Dashboard: React.FC = () => {
   if (records.length === 0) {
     return (
       <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
+        <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-primary/10 rounded-full text-primary">
+            <SparklesIcon className="w-8 h-8"/>
+        </div>
         <h2 className="text-2xl font-semibold text-slate-700 dark:text-slate-200">Welcome to Aysha's P&L</h2>
         <p className="text-slate-500 dark:text-slate-400 mt-2">Tap the '+' button below to create your first record.</p>
       </div>
@@ -171,15 +175,18 @@ const Dashboard: React.FC = () => {
     return 'Custom';
   }
 
-  const ProfitCard: React.FC<{ value: number, label: string, subLabel?: string }> = ({ value, label, subLabel }) => (
-    <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl shadow-sm h-full">
-        <h3 className="text-slate-500 dark:text-slate-400 font-medium text-xs sm:text-sm truncate">{label}</h3>
-        <p className={`text-xl sm:text-2xl font-bold mt-1 truncate ${value >= 0 ? 'text-success' : 'text-error'}`}>
-             ₹{Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-        </p>
-        {subLabel && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">{subLabel}</p>}
-    </div>
-  );
+  const ProfitCard: React.FC<{ value: number, label: string, subLabel?: string }> = ({ value, label, subLabel }) => {
+      const borderColor = value >= 0 ? 'border-success' : 'border-error';
+      return (
+        <div className={`bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl shadow-sm h-full border-t-4 ${borderColor}`}>
+            <h3 className="text-slate-500 dark:text-slate-400 font-medium text-xs sm:text-sm truncate">{label}</h3>
+            <p className={`text-xl sm:text-2xl font-bold mt-1 truncate ${value >= 0 ? 'text-success' : 'text-error'}`}>
+                 ₹{Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </p>
+            {subLabel && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">{subLabel}</p>}
+        </div>
+      );
+  };
   
   const filterOptions: { label: string; value: FilterValue }[] = [
     { label: '7D', value: '7D' },
@@ -283,7 +290,7 @@ const Dashboard: React.FC = () => {
                             onKeyDown={handleKeyDown}
                             role="button"
                             tabIndex={0}
-                            className="p-4 flex items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                            className="p-4 flex items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
                         >
                             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mr-4 flex-shrink-0">
                                 <span className="font-bold text-primary text-sm">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric' })}</span>

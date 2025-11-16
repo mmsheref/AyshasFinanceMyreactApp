@@ -15,43 +15,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-      @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes scaleIn {
-        from {
-          opacity: 0;
-          transform: scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
+      @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      @keyframes scaleOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
 
       /* Animation utility classes */
-      .animate-fadeInUp {
-        animation: fadeInUp 0.4s ease-out forwards;
-        animation-fill-mode: backwards;
-      }
-      .animate-fadeIn {
-        animation: fadeIn 0.3s ease-in-out forwards;
-        animation-fill-mode: backwards;
-      }
-      .animate-scaleIn {
-        animation: scaleIn 0.3s ease-out forwards;
-        animation-fill-mode: backwards;
+      .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; animation-fill-mode: backwards; }
+      .animate-fadeIn { animation: fadeIn 0.2s ease-in-out forwards; }
+      .animate-scaleIn { animation: scaleIn 0.2s cubic-bezier(0.2, 0, 0.13, 1.5) forwards; }
+      .animate-scaleOut { animation: scaleOut 0.2s ease-in forwards; }
+      
+      /* Global transitions for a smoother feel */
+      button, a, [role="button"] {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
       }
     </style>
     <script>
@@ -109,7 +88,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-100 dark:bg-slate-950">
+  <body class="bg-slate-50 dark:bg-slate-950">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

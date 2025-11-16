@@ -1,15 +1,32 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { DailyRecord, CustomExpenseStructure, BackupData } from '../types';
+import { DailyRecord, CustomExpenseStructure, BackupData, ReportCardVisibilitySettings } from '../types';
 import * as db from '../utils/db';
 import { migrateStructure, runMigration } from '../utils/migrations';
 import { DEFAULT_EXPENSE_STRUCTURE } from '../constants';
 
 type Theme = 'light' | 'dark' | 'system';
 
+const DEFAULT_CARD_VISIBILITY: ReportCardVisibilitySettings = {
+    NET_PROFIT: true,
+    PROFIT_MARGIN: true,
+    PRIME_COST: true,
+    TOTAL_SALES: true,
+    TOTAL_EXPENSES: true,
+    FOOD_COST: true,
+    LABOR_COST: true,
+    AVG_DAILY_SALES: true,
+    AVG_DAILY_PROFIT: true,
+    BUSIEST_DAY: true,
+    MOST_PROFITABLE_DAY: true,
+    LEAST_PROFITABLE_DAY: true,
+};
+
 interface AppContextType {
     records: DailyRecord[];
     sortedRecords: DailyRecord[];
     customStructure: CustomExpenseStructure;
+    foodCostCategories: string[];
+    reportCardVisibility: ReportCardVisibilitySettings;
     isLoading: boolean;
     theme: Theme;
     setTheme: (theme: Theme) => void;
@@ -19,6 +36,8 @@ interface AppContextType {
     handleRestore: (data: BackupData) => Promise<number>;
     handleUpdateStructure: (newStructure: CustomExpenseStructure) => Promise<void>;
     handleSaveCustomItem: (categoryName: string, itemName: string, defaultValue: number) => Promise<void>;
+    handleUpdateFoodCostCategories: (newCategories: string[]) => Promise<void>;
+    handleUpdateReportCardVisibility: (newVisibility: ReportCardVisibilitySettings) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -26,6 +45,8 @@ export const AppContext = createContext<AppContextType>({} as AppContextType);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [records, setRecords] = useState<DailyRecord[]>([]);
     const [customStructure, setCustomStructure] = useState<CustomExpenseStructure>({});
+    const [foodCostCategories, setFoodCostCategories] = useState<string[]>([]);
+    const [reportCardVisibility, setReportCardVisibility] = useState<ReportCardVisibilitySettings>(DEFAULT_CARD_VISIBILITY);
     const [isLoading, setIsLoading] = useState(true);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
 
@@ -57,20 +78,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     localStorage.removeItem('ayshas-records');
                     localStorage.removeItem('ayshas-custom-structure');
                     console.log("Migration complete.");
-                    return;
+                } else {
+                    const dbRecords = await db.getAllRecords();
+                    const dbStructure = await db.getCustomStructure();
+                    setRecords(dbRecords);
+                    if (dbStructure) {
+                        setCustomStructure(dbStructure);
+                    } else {
+                        const initialStructure = DEFAULT_EXPENSE_STRUCTURE;
+                        setCustomStructure(initialStructure);
+                        await db.saveCustomStructure(initialStructure);
+                    }
                 }
 
-                const dbRecords = await db.getAllRecords();
-                const dbStructure = await db.getCustomStructure();
-                
-                setRecords(dbRecords);
-
-                if (dbStructure) {
-                    setCustomStructure(dbStructure);
+                // Load food cost categories setting
+                const dbFoodCostCats = await db.getSetting('foodCostCategories');
+                if (dbFoodCostCats && Array.isArray(dbFoodCostCats)) {
+                    setFoodCostCategories(dbFoodCostCats);
                 } else {
-                    const initialStructure = DEFAULT_EXPENSE_STRUCTURE;
-                    setCustomStructure(initialStructure);
-                    await db.saveCustomStructure(initialStructure);
+                    // Set a smarter default that excludes 'Diary Expenses'
+                    const defaultCats = ['Market Bills', 'Meat'];
+                    await db.saveSetting('foodCostCategories', defaultCats);
+                    setFoodCostCategories(defaultCats);
+                }
+
+                // Load report card visibility setting
+                const dbCardVisibility = await db.getSetting('reportCardVisibility');
+                if (dbCardVisibility) {
+                    // Ensure new keys from default are added if they don't exist in saved settings
+                    setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
+                } else {
+                    await db.saveSetting('reportCardVisibility', DEFAULT_CARD_VISIBILITY);
+                    setReportCardVisibility(DEFAULT_CARD_VISIBILITY);
                 }
             } catch (error) {
                 console.error("Failed to load data from database", error);
@@ -165,11 +204,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await db.saveCustomStructure(newStructure);
         setCustomStructure(newStructure);
     };
+    
+    const handleUpdateFoodCostCategories = async (newCategories: string[]) => {
+        await db.saveSetting('foodCostCategories', newCategories);
+        setFoodCostCategories(newCategories);
+    };
+
+    const handleUpdateReportCardVisibility = async (newVisibility: ReportCardVisibilitySettings) => {
+        await db.saveSetting('reportCardVisibility', newVisibility);
+        setReportCardVisibility(newVisibility);
+    };
 
     const value = {
         records,
         sortedRecords,
         customStructure,
+        foodCostCategories,
+        reportCardVisibility,
         isLoading,
         theme,
         setTheme,
@@ -179,6 +230,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         handleRestore,
         handleUpdateStructure,
         handleSaveCustomItem,
+        handleUpdateFoodCostCategories,
+        handleUpdateReportCardVisibility,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

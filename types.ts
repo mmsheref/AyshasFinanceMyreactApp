@@ -33,3 +33,13 @@ export interface BackupData {
   records: DailyRecord[];
   customStructure: CustomExpenseStructure;
 }
+
+export type ReportMetric = 
+    | 'NET_PROFIT' | 'PROFIT_MARGIN' | 'PRIME_COST' 
+    | 'TOTAL_SALES' | 'TOTAL_EXPENSES' | 'FOOD_COST' 
+    | 'LABOR_COST' | 'AVG_DAILY_SALES' | 'AVG_DAILY_PROFIT' 
+    | 'BUSIEST_DAY' | 'MOST_PROFITABLE_DAY' | 'LEAST_PROFITABLE_DAY';
+
+export type ReportCardVisibilitySettings = {
+    [key in ReportMetric]: boolean;
+};

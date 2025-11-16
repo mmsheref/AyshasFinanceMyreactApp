@@ -1,9 +1,10 @@
 import { DailyRecord, CustomExpenseStructure } from '../types';
 
 const DB_NAME = 'AyshasPnlDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented version for new object store
 const RECORDS_STORE = 'records';
 const STRUCTURE_STORE = 'customStructure';
+const SETTINGS_STORE = 'settings';
 
 let db: IDBDatabase;
 
@@ -32,6 +33,9 @@ export const openDB = (): Promise<IDBDatabase> => {
       }
       if (!dbInstance.objectStoreNames.contains(STRUCTURE_STORE)) {
         dbInstance.createObjectStore(STRUCTURE_STORE, { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains(SETTINGS_STORE)) {
+        dbInstance.createObjectStore(SETTINGS_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -156,6 +160,41 @@ export const saveCustomStructure = async (structure: CustomExpenseStructure): Pr
         };
         request.onerror = () => {
             console.error('Error saving structure:', request.error);
+            reject(request.error);
+        };
+    });
+};
+
+// --- Settings CRUD ---
+export const getSetting = async (id: string): Promise<any | null> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(SETTINGS_STORE, 'readonly');
+        const store = transaction.objectStore(SETTINGS_STORE);
+        const request = store.get(id);
+
+        request.onsuccess = () => {
+            resolve(request.result ? request.result.value : null);
+        };
+        request.onerror = () => {
+            console.error(`Error getting setting "${id}":`, request.error);
+            reject(request.error);
+        };
+    });
+};
+
+export const saveSetting = async (id: string, value: any): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(SETTINGS_STORE, 'readwrite');
+        const store = transaction.objectStore(SETTINGS_STORE);
+        const request = store.put({ id, value });
+
+        request.onsuccess = () => {
+            resolve();
+        };
+        request.onerror = () => {
+            console.error(`Error saving setting "${id}":`, request.error);
             reject(request.error);
         };
     });
