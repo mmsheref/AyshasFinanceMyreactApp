@@ -5,7 +5,6 @@ import { useAppContext } from '../context/AppContext';
 import ExpenseStructureManager from './ExpenseStructureManager';
 import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon } from './Icons';
 import Modal from './Modal';
-// FIX: Import CustomExpenseStructure type.
 import { ReportMetric, ReportCardVisibilitySettings, CustomExpenseStructure } from '../types';
 import { METRIC_LABELS } from '../constants';
 
@@ -224,7 +223,7 @@ const SettingsPage: React.FC = () => {
             </SettingsGroup>
 
             <SettingsGroup title="About">
-                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About Aysha's P&L" description="Version 2.1.0 - A simple P&L tracker." onClick={() => navigate('/onboarding-rerun')} />
+                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About Aysha's P&L" description="Version 2.2.0 - A simple P&L tracker." onClick={() => navigate('/onboarding-rerun')} />
             </SettingsGroup>
             
             {isStructureModalOpen && (

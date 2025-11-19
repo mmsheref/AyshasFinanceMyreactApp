@@ -7,7 +7,8 @@ import { calculateTotalExpenses } from '../utils/record-utils';
 import DateRangePicker from './DateRangePicker';
 
 const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => void}> = React.memo(({ record, onView }) => {
-    const totalExpenses = calculateTotalExpenses(record);
+    const totalExpenses = useMemo(() => calculateTotalExpenses(record), [record]);
+
     const profit = record.totalSales - totalExpenses;
     const profitColor = profit >= 0 ? 'text-success' : 'text-error';
 

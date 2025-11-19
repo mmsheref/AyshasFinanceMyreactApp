@@ -3,6 +3,7 @@ import { DailyRecord, CustomExpenseStructure, BackupData, ReportCardVisibilitySe
 import * as db from '../utils/db';
 import { migrateStructure, runMigration } from '../utils/migrations';
 import { DEFAULT_EXPENSE_STRUCTURE } from '../constants';
+import { v4 as uuidv4 } from 'uuid';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -111,6 +112,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     await db.saveSetting('reportCardVisibility', DEFAULT_CARD_VISIBILITY);
                     setReportCardVisibility(DEFAULT_CARD_VISIBILITY);
                 }
+                
             } catch (error) {
                 console.error("Failed to load data from database", error);
             } finally {
@@ -197,6 +199,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         setRecords(migratedRecords);
         setCustomStructure(migratedStructure);
+        
+        alert(`Successfully imported ${data.records.length} records.`);
+
         return data.records.length;
     };
 
@@ -215,7 +220,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setReportCardVisibility(newVisibility);
     };
 
-    const value = {
+    const value: AppContextType = {
         records,
         sortedRecords,
         customStructure,

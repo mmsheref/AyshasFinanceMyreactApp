@@ -1,7 +1,7 @@
 import { DailyRecord, CustomExpenseStructure } from '../types';
 
 const DB_NAME = 'AyshasPnlDB';
-const DB_VERSION = 2; // Incremented version for new object store
+const DB_VERSION = 2; // Reverted version
 const RECORDS_STORE = 'records';
 const STRUCTURE_STORE = 'customStructure';
 const SETTINGS_STORE = 'settings';
@@ -36,6 +36,10 @@ export const openDB = (): Promise<IDBDatabase> => {
       }
       if (!dbInstance.objectStoreNames.contains(SETTINGS_STORE)) {
         dbInstance.createObjectStore(SETTINGS_STORE, { keyPath: 'id' });
+      }
+      // Migration from v3 -> v2: Remove the amortizedExpenses store if it exists
+      if (dbInstance.objectStoreNames.contains('amortizedExpenses')) {
+        dbInstance.deleteObjectStore('amortizedExpenses');
       }
     };
   });

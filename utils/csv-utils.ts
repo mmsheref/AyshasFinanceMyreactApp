@@ -1,4 +1,5 @@
 import { DailyRecord } from '../types';
+import { calculateTotalExpenses } from './record-utils';
 
 const escapeCsvField = (field: any): string => {
     const stringField = String(field ?? '');
@@ -6,15 +7,6 @@ const escapeCsvField = (field: any): string => {
         return `"${stringField.replace(/"/g, '""')}"`;
     }
     return stringField;
-};
-
-const calculateTotalExpenses = (record: DailyRecord): number => {
-    if (!record || !record.expenses) {
-        return 0;
-    }
-    return record.expenses.reduce((total, category) => 
-        total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 
-    0);
 };
 
 export const convertToCSV = (records: DailyRecord[]): string => {
@@ -44,47 +36,36 @@ export const convertToCSV = (records: DailyRecord[]): string => {
         const morningSales = record.morningSales || 0;
         const nightSales = record.totalSales - morningSales;
 
-        const hasExpenses = record.expenses.some(cat => cat.items.length > 0);
-
-        if (!hasExpenses) {
-            // Handle records with no expenses
+        let isFirstRowForRecord = true;
+        const allItems = record.expenses.flatMap(cat => cat.items.map(item => ({ ...item, categoryName: cat.name })));
+        
+        if (allItems.length === 0 || allItems.every(item => item.amount === 0)) {
             const row = [
-                record.date,
-                record.totalSales,
-                morningSales,
-                nightSales,
-                totalExpenses,
-                profit,
-                '', // Expense Category
-                '', // Expense Item
-                '', // Expense Amount
-                'No' // Bill Photo Attached
+                record.date, record.totalSales, morningSales, nightSales,
+                totalExpenses, profit, 'N/A', 'N/A', 'N/A', 'No'
             ].map(escapeCsvField);
             csvRows.push(row.join(','));
-        } else {
-            record.expenses.forEach(category => {
-                if (category.items.length === 0) {
-                    // This can happen if all items in a category were deleted.
-                    // We can choose to represent this or ignore it. Let's ignore for a cleaner export.
-                    return;
-                }
-                category.items.forEach(item => {
-                    const row = [
-                        record.date,
-                        record.totalSales,
-                        morningSales,
-                        nightSales,
-                        totalExpenses,
-                        profit,
-                        category.name,
-                        item.name,
-                        item.amount,
-                        (item.billPhotos && item.billPhotos.length > 0) ? 'Yes' : 'No'
-                    ].map(escapeCsvField);
-                    csvRows.push(row.join(','));
-                });
-            });
+            return;
         }
+
+        allItems.forEach(item => {
+            if (item.amount > 0) {
+                 const row = [
+                    isFirstRowForRecord ? record.date : '',
+                    isFirstRowForRecord ? record.totalSales : '',
+                    isFirstRowForRecord ? morningSales : '',
+                    isFirstRowForRecord ? nightSales : '',
+                    isFirstRowForRecord ? totalExpenses : '',
+                    isFirstRowForRecord ? profit : '',
+                    item.categoryName,
+                    item.name,
+                    item.amount,
+                    (item.billPhotos && item.billPhotos.length > 0) ? 'Yes' : 'No'
+                ].map(escapeCsvField);
+                csvRows.push(row.join(','));
+                isFirstRowForRecord = false;
+            }
+        });
     });
 
     return csvRows.join('\n');

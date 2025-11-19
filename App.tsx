@@ -11,6 +11,9 @@ import RecordDetail from './components/RecordDetail';
 import SettingsPage from './components/SettingsPage';
 import Onboarding from './components/Onboarding';
 import Reports from './components/Reports';
+import FileImportModal from './components/FileImportModal';
+import { BackupData } from './types';
+import { isBackupData } from './utils/validation-utils';
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex items-center justify-center min-h-screen">
@@ -62,9 +65,11 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const { isLoading } = useContext(AppContext);
+  const { isLoading, handleRestore, sortedRecords } = useContext(AppContext);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [pendingImportData, setPendingImportData] = useState<BackupData | null>(null);
+  const [isOldBackup, setIsOldBackup] = useState(false);
 
   useEffect(() => {
     const hasOnboarded = localStorage.getItem('hasOnboarded') === 'true';
@@ -73,12 +78,76 @@ const App: React.FC = () => {
     }
     setIsReady(true);
   }, []);
+  
+  useEffect(() => {
+    const listenerPromise = CapacitorApp.addListener('appUrlOpen', async (event) => {
+      const url = event.url;
+      if (!url || !url.toLocaleLowerCase().endsWith('.json')) {
+        console.log('App opened with a non-JSON URL, ignoring:', url);
+        return;
+      }
+      
+      console.log('Attempting to import from URL:', url);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch file content, status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (isBackupData(data)) {
+            console.log('Valid backup file detected, prompting user for import.');
+            
+            if (sortedRecords.length > 0 && data.records.length > 0) {
+                const newestAppRecordDate = new Date(sortedRecords[0].date);
+                const sortedBackupRecords = [...data.records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const newestBackupRecordDate = new Date(sortedBackupRecords[0].date);
+
+                if (newestBackupRecordDate < newestAppRecordDate) {
+                    console.warn('Backup file is older than current data.');
+                    setIsOldBackup(true);
+                } else {
+                    setIsOldBackup(false);
+                }
+            } else {
+                setIsOldBackup(false);
+            }
+
+            setPendingImportData(data);
+        } else {
+            console.warn('Opened JSON file is not a valid backup file.');
+            alert('The selected file is not a valid backup file for this application.');
+        }
+      } catch (error) {
+        console.error('Error handling opened file:', error);
+        alert(`An error occurred while trying to read the backup file. Error: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
+
+    return () => {
+        listenerPromise.then(listener => listener.remove())
+            .catch(e => console.error('Failed to remove appUrlOpen listener', e));
+    };
+  }, [sortedRecords]);
 
   const handleOnboardingFinish = () => {
     localStorage.setItem('hasOnboarded', 'true');
     setShowOnboarding(false);
   };
   
+  const handleConfirmImport = async () => {
+    if (pendingImportData) {
+      await handleRestore(pendingImportData);
+      setPendingImportData(null);
+      setIsOldBackup(false);
+    }
+  };
+
+  const handleCancelImport = () => {
+    setPendingImportData(null);
+    setIsOldBackup(false);
+  };
+
   if (!isReady || isLoading) {
     return <LoadingSpinner />;
   }
@@ -87,7 +156,19 @@ const App: React.FC = () => {
     return <Onboarding onFinish={handleOnboardingFinish} />;
   }
 
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      {pendingImportData && (
+        <FileImportModal
+          data={pendingImportData}
+          isOldBackup={isOldBackup}
+          onConfirm={handleConfirmImport}
+          onCancel={handleCancelImport}
+        />
+      )}
+    </>
+  );
 };
 
 export default App;

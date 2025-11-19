@@ -175,6 +175,7 @@ const RecordDetail: React.FC = () => {
              );
           })}
         </div>
+
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm flex justify-around items-center no-capture">

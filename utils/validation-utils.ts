@@ -33,5 +33,9 @@ export const isCustomStructure = (obj: any): obj is CustomExpenseStructure => {
 };
 
 export const isBackupData = (obj: any): obj is BackupData => {
-    return obj && typeof obj.version === 'number' && Array.isArray(obj.records) && obj.records.every(isDailyRecord) && isCustomStructure(obj.customStructure);
+    return obj && 
+        typeof obj.version === 'number' && 
+        Array.isArray(obj.records) && 
+        obj.records.every(isDailyRecord) && 
+        isCustomStructure(obj.customStructure);
 }

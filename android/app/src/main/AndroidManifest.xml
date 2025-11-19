@@ -23,9 +23,24 @@
             android:launchMode="singleTask"
             android:exported="true">
 
+            <!-- Launch from home screen -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Allow app to open .json backup files -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- Handle JSON files -->
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/json" />
+                <data android:pathPattern=".*\\.json" />
             </intent-filter>
 
         </activity>

@@ -342,8 +342,8 @@ const RecordForm: React.FC = () => {
             </div>
           </div>
            <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Night Sales</label>
-            <div className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+            <label id="nightSalesLabel" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Night Sales</label>
+            <div aria-labelledby="nightSalesLabel" className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                 <span className="text-slate-500 dark:text-slate-400 mr-1">₹</span>
                 <span className="font-semibold text-slate-700 dark:text-slate-300">{nightSales.toLocaleString('en-IN')}</span>
             </div>
