@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { DailyRecord, CustomExpenseStructure, BackupData } from '../types';
-import Modal from './Modal';
-import { DownloadIcon, UploadIcon, ShareIcon, InformationCircleIcon } from './Icons';
+import FileImportModal from './FileImportModal';
+import { DownloadIcon, UploadIcon, ShareIcon } from './Icons';
 import { saveBackupFile, shareBackupData, saveCsvFile } from '../utils/capacitor-utils';
 import { convertToCSV } from '../utils/csv-utils';
 import { isBackupData, isDailyRecord } from '../utils/validation-utils';
@@ -13,7 +13,6 @@ interface BackupRestoreProps {
 }
 
 const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructure, onRestore }) => {
-  const [showModal, setShowModal] = useState(false);
   const [recordsToImport, setRecordsToImport] = useState<BackupData | null>(null);
   const [isOldBackup, setIsOldBackup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,13 +76,15 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
 
         const processData = (backupData: BackupData) => {
             if (allRecords.length > 0 && backupData.records.length > 0) {
-                const sortedAppRecords = [...allRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const newestAppRecordDate = new Date(sortedAppRecords[0].date);
+                // Use string comparison for dates to avoid timezone issues.
+                // The 'YYYY-MM-DD' format is lexicographically sortable.
+                const sortedAppRecords = [...allRecords].sort((a, b) => b.date.localeCompare(a.date));
+                const newestAppRecordDateStr = sortedAppRecords[0].date;
 
-                const sortedBackupRecords = [...backupData.records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const newestBackupRecordDate = new Date(sortedBackupRecords[0].date);
+                const sortedBackupRecords = [...backupData.records].sort((a, b) => b.date.localeCompare(a.date));
+                const newestBackupRecordDateStr = sortedBackupRecords[0].date;
 
-                if (newestBackupRecordDate < newestAppRecordDate) {
+                if (newestBackupRecordDateStr < newestAppRecordDateStr) {
                     setIsOldBackup(true);
                 } else {
                     setIsOldBackup(false);
@@ -92,7 +93,6 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
                 setIsOldBackup(false);
             }
             setRecordsToImport(backupData);
-            setShowModal(true);
         };
 
         if (isBackupData(data)) {
@@ -121,13 +121,11 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
     if (recordsToImport) {
       onRestore(recordsToImport);
     }
-    setShowModal(false);
     setRecordsToImport(null);
     setIsOldBackup(false);
   };
   
   const cancelRestore = () => {
-    setShowModal(false);
     setRecordsToImport(null);
     setIsOldBackup(false);
   }
@@ -161,31 +159,13 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
           className="hidden"
         />
       </div>
-      {showModal && recordsToImport && (
-        <Modal onClose={cancelRestore}>
-            <div className="p-4 text-center bg-white dark:bg-slate-900 rounded-lg">
-                <h3 className="text-xl font-bold mb-4 dark:text-slate-100">Confirm Import</h3>
-                <p className="text-gray-600 dark:text-slate-300 mb-2">You are about to import <span className="font-bold">{recordsToImport.records.length}</span> records.</p>
-                 {(Object.keys(recordsToImport.customStructure).length > 0) && (
-                  <p className="text-gray-600 dark:text-slate-300 mb-2">This will also restore your saved custom expense structure.</p>
-                )}
-                {isOldBackup && (
-                    <div className="text-amber-600 font-semibold bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 p-3 rounded-md text-sm mt-4">
-                        <div className="flex items-start">
-                            <InformationCircleIcon className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-                            <span>Heads up! The newest record in this backup is older than your current data. Importing will overwrite your recent progress.</span>
-                        </div>
-                    </div>
-                )}
-                <p className="text-red-600 font-semibold bg-red-100 dark:bg-red-900/20 dark:text-red-400 p-3 rounded-md mt-4">
-                    Warning: This will overwrite all your current data. This action cannot be undone.
-                </p>
-                <div className="mt-6 flex justify-center space-x-4">
-                    <button onClick={cancelRestore} className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700">Cancel</button>
-                    <button onClick={confirmRestore} className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Confirm & Import</button>
-                </div>
-            </div>
-        </Modal>
+      {recordsToImport && (
+        <FileImportModal
+          data={recordsToImport}
+          isOldBackup={isOldBackup}
+          onConfirm={confirmRestore}
+          onCancel={cancelRestore}
+        />
       )}
     </>
   );

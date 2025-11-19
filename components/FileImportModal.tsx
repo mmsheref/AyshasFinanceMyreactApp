@@ -19,10 +19,15 @@ const FileImportModal: React.FC<FileImportModalProps> = ({ data, isOldBackup, on
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                 </svg>
             </div>
-            <h3 className="text-xl font-bold mt-4 mb-2 dark:text-slate-100">Import Backup File?</h3>
+            <h3 className="text-xl font-bold mt-4 mb-2 dark:text-slate-100">Confirm Import</h3>
             <p className="text-slate-600 dark:text-slate-300 mb-4">
-                You've opened a backup file. Do you want to import its <span className="font-bold">{data.records.length}</span> records?
+                You are about to import a backup file with <span className="font-bold">{data.records.length}</span> records.
             </p>
+            {(Object.keys(data.customStructure).length > 0) && (
+                <p className="text-slate-600 dark:text-slate-300 mb-4 -mt-2 text-sm">
+                    This will also restore your custom expense structure.
+                </p>
+            )}
             {isOldBackup && (
                 <div className="text-amber-600 font-semibold bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 p-3 rounded-md text-sm mb-4">
                     <div className="flex items-start">

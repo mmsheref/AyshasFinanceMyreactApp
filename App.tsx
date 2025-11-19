@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useContext, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -103,11 +104,13 @@ const App: React.FC = () => {
             console.log('Valid backup file detected, prompting user for import.');
             
             if (sortedRecords.length > 0 && data.records.length > 0) {
-                const newestAppRecordDate = new Date(sortedRecords[0].date);
-                const sortedBackupRecords = [...data.records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const newestBackupRecordDate = new Date(sortedBackupRecords[0].date);
+                // Use string comparison for dates to avoid timezone issues.
+                // The 'YYYY-MM-DD' format is lexicographically sortable.
+                const newestAppRecordDateStr = sortedRecords[0].date;
+                const sortedBackupRecords = [...data.records].sort((a, b) => b.date.localeCompare(a.date));
+                const newestBackupRecordDateStr = sortedBackupRecords[0].date;
 
-                if (newestBackupRecordDate < newestAppRecordDate) {
+                if (newestBackupRecordDateStr < newestAppRecordDateStr) {
                     console.warn('Backup file is older than current data.');
                     setIsOldBackup(true);
                 } else {
