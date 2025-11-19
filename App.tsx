@@ -1,6 +1,8 @@
+
 import React, { useEffect, useContext, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 import { AppContext } from './context/AppContext';
 import Layout from './components/Layout';
@@ -89,7 +91,9 @@ const App: React.FC = () => {
       
       console.log('Attempting to import from URL:', url);
       try {
-        const response = await fetch(url);
+        const fetchUrl = Capacitor.isNativePlatform() ? Capacitor.convertFileSrc(url) : url;
+        const response = await fetch(fetchUrl);
+
         if (!response.ok) {
             throw new Error(`Failed to fetch file content, status: ${response.status}`);
         }
