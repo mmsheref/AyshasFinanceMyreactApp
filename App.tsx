@@ -1,5 +1,5 @@
 
-import React, { useEffect, useContext, useState, useCallback } from 'react';
+import React, { useEffect, useContext, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -17,6 +17,7 @@ import FileImportModal from './components/FileImportModal';
 import Modal from './components/Modal';
 import { BackupData } from './types';
 import { isBackupData } from './utils/validation-utils';
+import { WarningIcon } from './components/Icons'; // Import an icon
 
 const ROOT_ROUTES = ['/', '/records', '/reports', '/settings'];
 
@@ -48,21 +49,36 @@ const AppRoutes: React.FC = () => {
     );
 };
 
+// MD3 Standard Basic Dialog
 const ExitConfirmModal: React.FC<{ onConfirm: () => void, onCancel: () => void }> = ({ onConfirm, onCancel }) => (
-    <Modal onClose={onCancel}>
-        <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px] text-center">
-             <h3 className="text-xl font-bold mb-2 text-surface-on dark:text-surface-on-dark">Exit App?</h3>
-             <p className="text-surface-on-variant dark:text-surface-on-variant-dark mb-6 text-sm">
+    <Modal onClose={onCancel} size="alert">
+        <div className="p-6 pb-2 text-center">
+             {/* Icon (Optional but good for visual anchor) */}
+             <div className="flex justify-center mb-4 text-secondary dark:text-secondary-dark">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+                </svg>
+             </div>
+
+             <h3 className="text-2xl font-normal text-surface-on dark:text-surface-on-dark mb-4">Exit App?</h3>
+             <p className="text-sm text-surface-on-variant dark:text-surface-on-variant-dark leading-relaxed">
                  Are you sure you want to close Ayshas Finance Tracker?
              </p>
-             <div className="flex justify-center gap-3">
-                 <button onClick={onCancel} className="px-5 py-2.5 text-primary dark:text-primary-dark font-medium hover:bg-surface-variant/10 rounded-full transition-colors">
-                     Cancel
-                 </button>
-                 <button onClick={onConfirm} className="px-6 py-2.5 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-medium hover:opacity-90 transition-opacity">
-                     Exit
-                 </button>
-             </div>
+        </div>
+        {/* Actions - Right Aligned Text Buttons */}
+        <div className="p-6 pt-2 flex justify-end gap-2">
+            <button 
+                onClick={onCancel} 
+                className="px-3 py-2 text-sm font-medium text-primary dark:text-primary-dark rounded-full hover:bg-primary/10 dark:hover:bg-primary-dark/10 transition-colors"
+            >
+                Cancel
+            </button>
+            <button 
+                onClick={onConfirm} 
+                className="px-3 py-2 text-sm font-medium text-primary dark:text-primary-dark rounded-full hover:bg-primary/10 dark:hover:bg-primary-dark/10 transition-colors"
+            >
+                Exit
+            </button>
         </div>
     </Modal>
 );
@@ -89,24 +105,19 @@ const App: React.FC = () => {
   // --- Hardware Back Button Handling ---
   useEffect(() => {
     const handleBackButton = async () => {
-        // 1. If Exit Modal is Open -> Exit App
         if (showExitModal) {
             CapacitorApp.exitApp();
             return;
         }
 
-        // 2. If Import Modal is Open -> Close it
         if (pendingImportData) {
             setPendingImportData(null);
             return;
         }
 
-        // 3. Check Route Depth
-        // If we are on a Root Route, ask to exit.
         if (ROOT_ROUTES.includes(location.pathname)) {
             setShowExitModal(true);
         } else {
-            // Otherwise, go back one step in history
             navigate(-1);
         }
     };
@@ -123,11 +134,9 @@ const App: React.FC = () => {
     const listenerPromise = CapacitorApp.addListener('appUrlOpen', async (event) => {
       const url = event.url;
       if (!url || !url.toLocaleLowerCase().endsWith('.json')) {
-        console.log('App opened with a non-JSON URL, ignoring:', url);
         return;
       }
       
-      console.log('Attempting to import from URL:', url);
       try {
         const fetchUrl = Capacitor.isNativePlatform() ? Capacitor.convertFileSrc(url) : url;
         const response = await fetch(fetchUrl);
@@ -138,8 +147,6 @@ const App: React.FC = () => {
         const data = await response.json();
 
         if (isBackupData(data)) {
-            console.log('Valid backup file detected, prompting user for import.');
-            
             if (sortedRecords.length > 0 && data.records.length > 0) {
                 const newestAppRecordDateStr = sortedRecords[0].date;
                 const sortedBackupRecords = [...data.records].sort((a, b) => b.date.localeCompare(a.date));

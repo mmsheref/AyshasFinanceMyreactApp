@@ -4,21 +4,35 @@ import { createPortal } from 'react-dom';
 interface ModalProps {
   children: ReactNode;
   onClose: () => void;
-  size?: 'default' | 'large';
+  size?: 'default' | 'large' | 'alert'; // Added 'alert' size for MD3 dialogs
 }
 
 const Modal: React.FC<ModalProps> = ({ children, onClose, size = 'default' }) => {
   const [isClosing, setIsClosing] = useState(false);
-  const sizeClass = size === 'large' ? 'max-w-4xl' : 'max-w-sm w-full';
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+
+  // MD3 Dialog Width Specs
+  let widthClass = '';
+  switch (size) {
+    case 'alert':
+        widthClass = 'w-[312px] min-w-[312px] max-w-[312px]'; // Strict Android Spec
+        break;
+    case 'large':
+        widthClass = 'w-full max-w-4xl';
+        break;
+    case 'default':
+    default:
+        widthClass = 'w-full max-w-sm';
+        break;
+  }
 
   const handleClose = () => {
     setIsClosing(true);
     if (backdropRef.current) {
       backdropRef.current.style.opacity = '0';
     }
-    setTimeout(onClose, 200); // Corresponds to scaleOut animation duration
+    setTimeout(onClose, 200);
   };
 
   useEffect(() => {
@@ -31,7 +45,6 @@ const Modal: React.FC<ModalProps> = ({ children, onClose, size = 'default' }) =>
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Focus trapping logic
   useEffect(() => {
     if (isClosing) return;
 
@@ -45,15 +58,14 @@ const Modal: React.FC<ModalProps> = ({ children, onClose, size = 'default' }) =>
 
     const handleTabKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
-
       const lastElement = focusableElements[focusableElements.length - 1];
 
-      if (e.shiftKey) { // Shift+Tab
+      if (e.shiftKey) { 
         if (document.activeElement === firstElement) {
           lastElement.focus();
           e.preventDefault();
         }
-      } else { // Tab
+      } else { 
         if (document.activeElement === lastElement) {
           firstElement.focus();
           e.preventDefault();
@@ -65,21 +77,18 @@ const Modal: React.FC<ModalProps> = ({ children, onClose, size = 'default' }) =>
     return () => window.removeEventListener('keydown', handleTabKey);
   }, [isClosing]);
 
-  // Using createPortal ensures the modal is rendered at the end of the document body,
-  // bypassing any parent CSS transforms (like animations in Layout) that would otherwise 
-  // break 'fixed' positioning and cause the modal to scroll with the page.
   return createPortal(
     <div
       ref={backdropRef}
       className="fixed inset-0 z-[100] flex justify-center items-center p-4 animate-fadeIn"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)', transition: 'opacity 200ms ease-in-out' }}
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)', transition: 'opacity 200ms ease-in-out' }} // Standard MD3 Scrim
       onClick={handleClose}
       role="dialog"
       aria-modal="true"
     >
       <div
         ref={modalRef}
-        className={`bg-surface-container-high dark:bg-surface-dark-container-high rounded-modal shadow-2xl ${sizeClass} ${isClosing ? 'animate-scaleOut' : 'animate-scaleIn'} overflow-hidden border border-surface-outline/10 dark:border-surface-outline-dark/10 max-h-[90vh] flex flex-col`}
+        className={`bg-surface-container-high dark:bg-surface-dark-container-high rounded-modal shadow-elevation-2 ${widthClass} ${isClosing ? 'animate-scaleOut' : 'animate-scaleIn'} overflow-hidden flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}

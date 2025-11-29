@@ -281,13 +281,6 @@ const RecordForm: React.FC = () => {
 
   // Material Outlined Input Component
   const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = "text", placeholder = "", prefix, parentBg = "bg-surface-container" }: any) => {
-      // Determine the correct background color for the floating label based on where the input lives
-      // Default is container (e.g., card). If it's inside a different context, pass it.
-      // We need strict class mapping for dark mode support.
-      // parentBg usually needs to match the container's background for the 'gap' effect.
-      // However, a safer way for label backgrounds in dark mode is to just be transparent if possible, 
-      // but standard MD3 inputs obscure the border. 
-      // Let's use the explicit container colors.
       const labelBgClass = parentBg === "bg-surface-container" 
         ? "bg-surface-container dark:bg-surface-dark-container" 
         : parentBg;
@@ -525,17 +518,19 @@ const RecordForm: React.FC = () => {
       )}
 
       {deleteConfirmation && (
-        <Modal onClose={() => setDeleteConfirmation(null)}>
-            <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px] text-center">
-                 <div className="w-12 h-12 mx-auto bg-error-container dark:bg-error-container-dark text-error dark:text-error-dark rounded-full flex items-center justify-center mb-4">
+        <Modal onClose={() => setDeleteConfirmation(null)} size="alert">
+            <div className="p-6 pb-2 text-center">
+                 <div className="flex justify-center mb-4 text-secondary dark:text-secondary-dark">
                     <TrashIcon className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-medium mb-2 text-surface-on dark:text-surface-on-dark">Delete Item?</h3>
-                <p className="text-surface-on-variant dark:text-surface-on-variant-dark mb-6">Are you sure you want to remove <span className="font-bold">{deleteConfirmation.itemName}</span>?</p>
-                <div className="flex justify-center gap-3">
-                    <button type="button" onClick={() => setDeleteConfirmation(null)} className="px-6 py-2.5 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-surface-on dark:text-surface-on-dark font-medium">Cancel</button>
-                    <button type="button" onClick={confirmRemoveExpenseItem} className="px-6 py-2.5 bg-error dark:bg-error-dark text-white dark:text-error-on-dark rounded-full font-medium">Delete</button>
-                </div>
+                <h3 className="text-2xl font-normal mb-4 text-surface-on dark:text-surface-on-dark">Delete Item?</h3>
+                <p className="text-sm text-surface-on-variant dark:text-surface-on-variant-dark leading-relaxed">
+                    Are you sure you want to remove <span className="font-semibold">{deleteConfirmation.itemName}</span>?
+                </p>
+            </div>
+            <div className="p-6 pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setDeleteConfirmation(null)} className="px-3 py-2 text-sm font-medium text-primary dark:text-primary-dark rounded-full hover:bg-primary/10 dark:hover:bg-primary-dark/10 transition-colors">Cancel</button>
+                <button type="button" onClick={confirmRemoveExpenseItem} className="px-3 py-2 text-sm font-medium text-error dark:text-error-dark rounded-full hover:bg-error/10 dark:hover:bg-error-dark/10 transition-colors">Delete</button>
             </div>
         </Modal>
       )}
