@@ -10,6 +10,35 @@ import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon, SearchIcon, ChevronR
 
 const RECURRING_EXPENSE_CATEGORIES = ['Labours', 'Fixed Costs'];
 
+// Material Outlined Input Component - Moved OUTSIDE to prevent focus loss bugs
+const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = "text", placeholder = "", prefix, parentBg = "bg-surface-container", ...props }: any) => {
+    const labelBgClass = parentBg === "bg-surface-container" 
+      ? "bg-surface-container dark:bg-surface-dark-container" 
+      : parentBg;
+
+    return (
+    <div className="relative group">
+        <input
+            type={type}
+            id={id}
+            name={id}
+            inputMode={inputMode}
+            value={value}
+            onChange={onChange}
+            placeholder=" " 
+            className={`block px-4 pb-2.5 pt-4 w-full text-base text-surface-on dark:text-surface-on-dark bg-transparent rounded-lg border border-surface-outline/50 dark:border-surface-outline-dark/50 appearance-none focus:outline-none focus:ring-0 focus:border-primary dark:focus:border-primary-dark peer ${prefix ? 'pl-7' : ''}`}
+            {...props}
+        />
+        {prefix && <span className="absolute top-4 left-3 text-surface-on-variant dark:text-surface-on-variant-dark">₹</span>}
+        <label
+            htmlFor={id}
+            className={`absolute text-base text-surface-on-variant dark:text-surface-on-variant-dark duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] ${labelBgClass} px-2 peer-focus:px-2 peer-focus:text-primary dark:peer-focus:text-primary-dark peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${prefix ? 'peer-focus:left-1 peer-placeholder-shown:left-5' : ''}`}
+        >
+            {label}
+        </label>
+    </div>
+)};
+
 const RecordForm: React.FC = () => {
   const { recordId } = useParams<{ recordId: string }>();
   const navigate = useNavigate();
@@ -135,15 +164,24 @@ const RecordForm: React.FC = () => {
         updatedFormData.date = value;
         updatedFormData.id = value;
     } else {
-        const parsedValue = parseFloat(value);
-        (updatedFormData as any)[name] = isNaN(parsedValue) ? 0 : parsedValue;
+        // Allow empty string to clear the input, otherwise parse
+        if (value === '') {
+            (updatedFormData as any)[name] = 0;
+        } else {
+            const parsedValue = parseFloat(value);
+            (updatedFormData as any)[name] = isNaN(parsedValue) ? 0 : parsedValue;
+        }
     }
     setFormData(updatedFormData);
   };
 
-  const handleExpenseChange = (catIndex: number, itemIndex: number, value: number) => {
+  const handleExpenseChange = (catIndex: number, itemIndex: number, valueStr: string) => {
     const newExpenses = [...expenses];
-    newExpenses[catIndex].items[itemIndex].amount = value;
+    // Allow typing decimals by not aggressively parsing if it ends in a dot
+    let val = parseFloat(valueStr);
+    if (isNaN(val)) val = 0;
+    
+    newExpenses[catIndex].items[itemIndex].amount = val;
     setFormData({ ...formData, expenses: newExpenses });
   };
   
@@ -278,35 +316,6 @@ const RecordForm: React.FC = () => {
     }
   };
 
-
-  // Material Outlined Input Component
-  const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = "text", placeholder = "", prefix, parentBg = "bg-surface-container" }: any) => {
-      const labelBgClass = parentBg === "bg-surface-container" 
-        ? "bg-surface-container dark:bg-surface-dark-container" 
-        : parentBg;
-
-      return (
-      <div className="relative group">
-          <input
-              type={type}
-              id={id}
-              name={id}
-              inputMode={inputMode}
-              value={value}
-              onChange={onChange}
-              placeholder=" " 
-              className={`block px-4 pb-2.5 pt-4 w-full text-base text-surface-on dark:text-surface-on-dark bg-transparent rounded-lg border border-surface-outline/50 dark:border-surface-outline-dark/50 appearance-none focus:outline-none focus:ring-0 focus:border-primary dark:focus:border-primary-dark peer ${prefix ? 'pl-7' : ''}`}
-          />
-          {prefix && <span className="absolute top-4 left-3 text-surface-on-variant dark:text-surface-on-variant-dark">₹</span>}
-          <label
-              htmlFor={id}
-              className={`absolute text-base text-surface-on-variant dark:text-surface-on-variant-dark duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] ${labelBgClass} px-2 peer-focus:px-2 peer-focus:text-primary dark:peer-focus:text-primary-dark peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${prefix ? 'peer-focus:left-1 peer-placeholder-shown:left-5' : ''}`}
-          >
-              {label}
-          </label>
-      </div>
-  )};
-
   const isSearching = expenseSearchTerm.trim().length > 0;
 
   return (
@@ -401,7 +410,7 @@ const RecordForm: React.FC = () => {
                                     <OutlinedInput 
                                         id={`${category.id}-${item.id}`}
                                         value={item.amount === 0 ? '' : item.amount}
-                                        onChange={(e: any) => handleExpenseChange(catIndex, itemIndex, parseFloat(e.target.value) || 0)}
+                                        onChange={(e: any) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
                                         type="number"
                                         inputMode="decimal"
                                         prefix
