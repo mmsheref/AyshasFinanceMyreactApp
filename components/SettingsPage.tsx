@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import BackupRestore from './BackupRestore';
 import { useAppContext } from '../context/AppContext';
 import ExpenseStructureManager from './ExpenseStructureManager';
-import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon } from './Icons';
+import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon } from './Icons';
 import Modal from './Modal';
 import { ReportMetric, ReportCardVisibilitySettings, CustomExpenseStructure } from '../types';
 import { METRIC_LABELS } from '../constants';
@@ -160,6 +160,7 @@ const SettingsPage: React.FC = () => {
     const [isStructureModalOpen, setStructureModalOpen] = useState(false);
     const [isFoodCostModalOpen, setFoodCostModalOpen] = useState(false);
     const [isReportCardModalOpen, setReportCardModalOpen] = useState(false);
+    const [isAboutModalOpen, setAboutModalOpen] = useState(false);
 
     const onStructureUpdate = async (newStructure: CustomExpenseStructure) => {
         await handleUpdateStructure(newStructure);
@@ -194,7 +195,7 @@ const SettingsPage: React.FC = () => {
             </SettingsGroup>
 
             <SettingsGroup title="App Info">
-                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About" description="Version 2.2.0 (Material Design 3)" onClick={() => navigate('/onboarding-rerun')} />
+                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About" description="Version 2.2.0 • Credits" onClick={() => setAboutModalOpen(true)} />
             </SettingsGroup>
             
             {isStructureModalOpen && (
@@ -215,6 +216,44 @@ const SettingsPage: React.FC = () => {
 
             {isFoodCostModalOpen && <FoodCostCategoryManager onClose={() => setFoodCostModalOpen(false)} />}
             {isReportCardModalOpen && <ReportCardManager onClose={() => setReportCardModalOpen(false)} />}
+            
+            {isAboutModalOpen && (
+                <Modal onClose={() => setAboutModalOpen(false)}>
+                    <div className="p-8 bg-surface-container dark:bg-surface-dark-container rounded-[28px] text-center">
+                        <div className="w-20 h-20 mx-auto bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark rounded-[20px] flex items-center justify-center mb-6 shadow-elevation-1">
+                            <SparklesIcon className="w-10 h-10" />
+                        </div>
+                        
+                        <h2 className="text-2xl font-bold text-surface-on dark:text-surface-on-dark mb-1">Ayshas Finance Tracker</h2>
+                        <p className="text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-high dark:bg-surface-dark-container-high py-1 px-3 rounded-full inline-block mb-8">
+                            Version 2.2.0
+                        </p>
+
+                        <div className="space-y-6">
+                            <div>
+                                <p className="text-xs font-bold text-surface-on-variant dark:text-surface-on-variant-dark uppercase tracking-widest mb-2">Developed By</p>
+                                <div className="p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-2xl border border-surface-outline/5 dark:border-surface-outline-dark/5">
+                                    <p className="text-xl font-bold text-primary dark:text-primary-dark">Ameer</p>
+                                    <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">Lead Developer & Designer</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                            <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">
+                                Built with React, Capacitor & Material Design 3
+                            </p>
+                        </div>
+
+                        <button 
+                            onClick={() => setAboutModalOpen(false)} 
+                            className="mt-8 w-full py-3.5 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-bold shadow-sm active:scale-[0.98] transition-transform"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 };
