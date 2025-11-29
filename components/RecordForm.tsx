@@ -8,8 +8,6 @@ import ImageUpload from './ImageUpload';
 import Modal from './Modal';
 import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon, SearchIcon, ChevronRightIcon } from './Icons';
 
-const RECURRING_EXPENSE_CATEGORIES = ['Labours', 'Fixed Costs'];
-
 // Material Outlined Input Component - Moved OUTSIDE to prevent focus loss bugs
 const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = "text", placeholder = "", prefix, parentBg = "bg-surface-container", ...props }: any) => {
     const labelBgClass = parentBg === "bg-surface-container" 
@@ -75,24 +73,10 @@ const RecordForm: React.FC = () => {
           navigate('/records'); 
         }
       } else {
+        // Generate new expenses based on the custom structure defaults.
+        // The old logic that copied from the previous day has been removed as requested.
         const newExpenses = generateNewRecordExpenses(customStructure);
-        const mostRecentRecord = sortedRecords[0];
-
-        if (mostRecentRecord) {
-            newExpenses.forEach(category => {
-                if (RECURRING_EXPENSE_CATEGORIES.includes(category.name)) {
-                    const correspondingOldCategory = mostRecentRecord.expenses.find(c => c.name === category.name);
-                    if (correspondingOldCategory) {
-                        category.items.forEach(item => {
-                            const correspondingOldItem = correspondingOldCategory.items.find(i => i.name === item.name);
-                            if (correspondingOldItem) {
-                                item.amount = correspondingOldItem.amount;
-                            }
-                        });
-                    }
-                }
-            });
-        }
+        
         const today = new Date().toISOString().split('T')[0];
         setFormData({
           id: today, date: today, totalSales: 0, morningSales: 0, expenses: newExpenses
@@ -101,7 +85,7 @@ const RecordForm: React.FC = () => {
       }
     };
     initializeForm();
-  }, [recordId, isEditing, getRecordById, navigate, customStructure, sortedRecords]);
+  }, [recordId, isEditing, getRecordById, navigate, customStructure]);
 
   useEffect(() => {
     if (!formData?.date) {
@@ -398,7 +382,7 @@ const RecordForm: React.FC = () => {
                         {category.items.map((item) => {
                         const itemIndex = item.originalIndex;
                         return (
-                        <div key={item.id} className="space-y-3">
+                        <div key={item.id} className="space-y-2">
                             <div className="flex justify-between items-center">
                                 <label htmlFor={`${category.id}-${item.id}`} className="text-sm font-medium text-surface-on dark:text-surface-on-dark">{item.name}</label>
                                 <button type="button" onClick={() => setDeleteConfirmation({catIndex, itemIndex, itemName: item.name})} className="p-2 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark active:bg-error-container/20 rounded-full" aria-label={`Remove ${item.name}`}>
@@ -420,9 +404,7 @@ const RecordForm: React.FC = () => {
                                     />
                                 </div>
                                 {CATEGORIES_WITH_BILL_UPLOAD.includes(category.name) && (
-                                    <div className="pb-1">
-                                        <ImageUpload billPhotos={item.billPhotos} onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} />
-                                    </div>
+                                    <ImageUpload billPhotos={item.billPhotos} onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} />
                                 )}
                             </div>
                         </div>

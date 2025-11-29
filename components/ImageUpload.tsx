@@ -99,7 +99,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
       <button
         type="button"
         onClick={handlePrimaryClick}
-        className={`w-full mt-2 text-sm font-medium p-2 rounded-lg flex items-center justify-center transition-colors ${
+        className={`w-full text-sm font-medium p-2 rounded-lg flex items-center justify-center transition-colors ${
           billPhotos.length > 0
             ? 'bg-secondary-container/50 dark:bg-secondary-container-dark/50 text-secondary-on-container dark:text-secondary-on-container-dark hover:bg-secondary-container dark:hover:bg-secondary-container-dark'
             : 'bg-surface-container-high dark:bg-surface-dark-container-high text-surface-on-variant dark:text-surface-on-variant-dark hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest'
