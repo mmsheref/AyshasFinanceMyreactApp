@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#FEF7FF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="/vite.svg" />
+    <title>Ayshas Finance Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      /* Material 3 Standard Typography */
+      body { font-family: 'Roboto', sans-serif; }
+      
+      /* Hide scrollbar for clean mobile look */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+      /* Animations */
+      @keyframes fadeScale { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+      .animate-fadeScale { animation: fadeScale 0.2s cubic-bezier(0.2, 0, 0, 1) forwards; }
+      
+      @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+      .animate-scaleIn { animation: scaleIn 0.15s cubic-bezier(0.05, 0.7, 0.1, 1.0) forwards; }
+      
+      @keyframes scaleOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.9); } }
+      .animate-scaleOut { animation: scaleOut 0.15s cubic-bezier(0.3, 0.0, 0.8, 0.15) forwards; }
+
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+    </style>
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Roboto', 'sans-serif'],
+            },
+            colors: {
+              // Material 3 Precise Tokens
+              primary: {
+                DEFAULT: '#6750A4', 
+                container: '#EADDFF', 
+                on: '#FFFFFF',
+                'on-container': '#21005D', 
+                
+                dark: '#D0BCFF', 
+                'on-dark': '#381E72', 
+                'container-dark': '#4F378B', 
+                'on-container-dark': '#EADDFF', 
+              },
+              secondary: {
+                DEFAULT: '#625B71',
+                container: '#E8DEF8',
+                on: '#FFFFFF',
+                'on-container': '#1D192B',
+                
+                dark: '#CCC2DC',
+                'on-dark': '#332D41',
+                'container-dark': '#4A4458',
+                'on-container-dark': '#E8DEF8',
+              },
+              tertiary: {
+                DEFAULT: '#7D5260',
+                container: '#FFD8E4',
+                on: '#FFFFFF',
+                'on-container': '#31111D',
+                
+                dark: '#EFB8C8',
+                'on-dark': '#492532',
+                'container-dark': '#633B48',
+                'on-container-dark': '#FFD8E4',
+              },
+              error: {
+                DEFAULT: '#B3261E',
+                container: '#F9DEDC',
+                on: '#FFFFFF',
+                'on-container': '#410E0B',
+                
+                dark: '#F2B8B5',
+                'on-dark': '#601410',
+                'container-dark': '#8C1D18',
+                'on-container-dark': '#F9DEDC',
+              },
+              success: {
+                DEFAULT: '#006C4C',
+                dark: '#6DD58C',
+              },
+              // Surface Colors - The Backbone of Material 3
+              surface: {
+                // Light
+                DEFAULT: '#FEF7FF',      
+                'container-low': '#F7F2FA',
+                'container': '#F3EDF7',
+                'container-high': '#ECE6F0',
+                'container-highest': '#E6E0E9',
+                
+                // Text Colors Light
+                on: '#1D1B20',
+                'on-variant': '#49454F',
+                outline: '#79747E',
+                'outline-variant': '#CAC4D0',
+                
+                // Dark
+                dark: '#141218', 
+                'dark-container-low': '#1D1B20',
+                'dark-container': '#211F26',
+                'dark-container-high': '#2B2930',
+                'dark-container-highest': '#36343B',
+                
+                // Text Colors Dark
+                'on-dark': '#E6E1E5',
+                'on-variant-dark': '#CAC4D0',
+                'outline-dark': '#938F99',
+              },
+            },
+            borderRadius: {
+              'card': '20px',    // MD3 Medium Card
+              'modal': '28px',   // MD3 Dialog
+              'fab': '16px',     // MD3 FAB
+            },
+            boxShadow: {
+              'elevation-1': '0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15)',
+              'elevation-2': '0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15)',
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "@capacitor/app": "https://aistudiocdn.com/@capacitor/app@^7.1.0",
+    "@capacitor/core": "https://aistudiocdn.com/@capacitor/core@^7.4.4",
+    "@capacitor/filesystem": "https://aistudiocdn.com/@capacitor/filesystem@^7.1.5",
+    "@capacitor/share": "https://aistudiocdn.com/@capacitor/share@^7.0.2",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@capacitor/cli": "https://aistudiocdn.com/@capacitor/cli@^7.4.4"
+  }
+}
+</script>
+</head>
+  <body class="bg-surface dark:bg-surface-dark text-surface-on dark:text-surface-on-dark select-none tap-highlight-transparent antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

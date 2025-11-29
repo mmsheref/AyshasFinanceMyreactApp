@@ -1,0 +1,7 @@
+{
+  "name": "Ayshas Finance Tracker ",
+  "description": "A daily profit and loss calculator for a restaurant. It allows tracking sales and detailed expenses, managing records, and provides features like bill photo uploads, data backup, and restore.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

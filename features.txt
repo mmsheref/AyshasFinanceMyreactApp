@@ -1,0 +1,25 @@
+- Dashboard with key metrics (7-day and 30-day average profit)
+- Profit/Loss trend chart for the last 30 entries
+- List of recent financial records on the dashboard
+- Reports page with advanced analytics:
+  - Date filtering (This Week, This Month, Custom Range, etc.)
+  - KPI summaries (Total Profit, Profit Margin, Average Profit)
+  - Expense breakdown by category with a donut chart
+  - Top 5 individual expense items
+  - Morning vs. Night sales analysis
+- Create, Read, Update, and Delete (CRUD) operations for daily records
+- Date-based record identification
+- Detailed expense tracking with customizable categories
+- Ability to add new, custom expense items and save them for future use
+- Pre-filling of recurring expenses (Labours, Fixed Costs) from the most recent record
+- Bill photo upload for individual expense items
+- Image compression for uploaded photos
+- Calculation of total sales, total expenses, and profit/loss for each day
+- Detailed view for each daily record with a full expense breakdown
+- Search functionality to find records by date
+- Ability to generate and share a PNG image of a daily report
+- Data backup to a JSON file
+- Data restoration from a JSON file, including legacy format support
+- Mobile-first, responsive user interface
+- Intuitive navigation with a bottom navigation bar and header
+- All data stored locally for offline access
