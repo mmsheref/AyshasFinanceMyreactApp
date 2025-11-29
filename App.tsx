@@ -1,6 +1,5 @@
 
-
-import React, { useEffect, useContext, useState } from 'react';
+import React, { useEffect, useContext, useState, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -15,8 +14,11 @@ import SettingsPage from './components/SettingsPage';
 import Onboarding from './components/Onboarding';
 import Reports from './components/Reports';
 import FileImportModal from './components/FileImportModal';
+import Modal from './components/Modal';
 import { BackupData } from './types';
 import { isBackupData } from './utils/validation-utils';
+
+const ROOT_ROUTES = ['/', '/records', '/reports', '/settings'];
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex items-center justify-center min-h-screen">
@@ -31,27 +33,6 @@ const LoadingSpinner: React.FC = () => (
 );
 
 const AppRoutes: React.FC = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-
-    useEffect(() => {
-        const listenerPromise = CapacitorApp.addListener('backButton', () => {
-            if (location.pathname === '/' || location.pathname === '/records' || location.pathname === '/reports' || location.pathname === '/settings') {
-                 // On root pages, do nothing to allow default OS behavior or exit app
-            } else {
-                navigate(-1);
-            }
-        });
-
-        return () => {
-            listenerPromise.then(listener => {
-                listener.remove();
-            }).catch(error => {
-                console.error('Failed to remove backButton listener', error);
-            });
-        };
-    }, [location, navigate]);
-
     return (
         <Routes>
             <Route path="/" element={<Layout />}>
@@ -67,12 +48,35 @@ const AppRoutes: React.FC = () => {
     );
 };
 
+const ExitConfirmModal: React.FC<{ onConfirm: () => void, onCancel: () => void }> = ({ onConfirm, onCancel }) => (
+    <Modal onClose={onCancel}>
+        <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px] text-center">
+             <h3 className="text-xl font-bold mb-2 text-surface-on dark:text-surface-on-dark">Exit App?</h3>
+             <p className="text-surface-on-variant dark:text-surface-on-variant-dark mb-6 text-sm">
+                 Are you sure you want to close Ayshas Finance Tracker?
+             </p>
+             <div className="flex justify-center gap-3">
+                 <button onClick={onCancel} className="px-5 py-2.5 text-primary dark:text-primary-dark font-medium hover:bg-surface-variant/10 rounded-full transition-colors">
+                     Cancel
+                 </button>
+                 <button onClick={onConfirm} className="px-6 py-2.5 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-medium hover:opacity-90 transition-opacity">
+                     Exit
+                 </button>
+             </div>
+        </div>
+    </Modal>
+);
+
 const App: React.FC = () => {
   const { isLoading, handleRestore, sortedRecords } = useContext(AppContext);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<BackupData | null>(null);
   const [isOldBackup, setIsOldBackup] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const hasOnboarded = localStorage.getItem('hasOnboarded') === 'true';
@@ -81,7 +85,40 @@ const App: React.FC = () => {
     }
     setIsReady(true);
   }, []);
-  
+
+  // --- Hardware Back Button Handling ---
+  useEffect(() => {
+    const handleBackButton = async () => {
+        // 1. If Exit Modal is Open -> Exit App
+        if (showExitModal) {
+            CapacitorApp.exitApp();
+            return;
+        }
+
+        // 2. If Import Modal is Open -> Close it
+        if (pendingImportData) {
+            setPendingImportData(null);
+            return;
+        }
+
+        // 3. Check Route Depth
+        // If we are on a Root Route, ask to exit.
+        if (ROOT_ROUTES.includes(location.pathname)) {
+            setShowExitModal(true);
+        } else {
+            // Otherwise, go back one step in history
+            navigate(-1);
+        }
+    };
+
+    const listenerPromise = CapacitorApp.addListener('backButton', handleBackButton);
+
+    return () => {
+        listenerPromise.then(listener => listener.remove()).catch(console.error);
+    };
+  }, [location.pathname, showExitModal, pendingImportData, navigate]);
+
+  // --- JSON File Import Listener ---
   useEffect(() => {
     const listenerPromise = CapacitorApp.addListener('appUrlOpen', async (event) => {
       const url = event.url;
@@ -104,14 +141,11 @@ const App: React.FC = () => {
             console.log('Valid backup file detected, prompting user for import.');
             
             if (sortedRecords.length > 0 && data.records.length > 0) {
-                // Use string comparison for dates to avoid timezone issues.
-                // The 'YYYY-MM-DD' format is lexicographically sortable.
                 const newestAppRecordDateStr = sortedRecords[0].date;
                 const sortedBackupRecords = [...data.records].sort((a, b) => b.date.localeCompare(a.date));
                 const newestBackupRecordDateStr = sortedBackupRecords[0].date;
 
                 if (newestBackupRecordDateStr < newestAppRecordDateStr) {
-                    console.warn('Backup file is older than current data.');
                     setIsOldBackup(true);
                 } else {
                     setIsOldBackup(false);
@@ -122,7 +156,6 @@ const App: React.FC = () => {
 
             setPendingImportData(data);
         } else {
-            console.warn('Opened JSON file is not a valid backup file.');
             alert('The selected file is not a valid backup file for this application.');
         }
       } catch (error) {
@@ -166,6 +199,7 @@ const App: React.FC = () => {
   return (
     <>
       <AppRoutes />
+      
       {pendingImportData && (
         <FileImportModal
           data={pendingImportData}
@@ -173,6 +207,13 @@ const App: React.FC = () => {
           onConfirm={handleConfirmImport}
           onCancel={handleCancelImport}
         />
+      )}
+
+      {showExitModal && (
+          <ExitConfirmModal 
+            onConfirm={() => CapacitorApp.exitApp()}
+            onCancel={() => setShowExitModal(false)}
+          />
       )}
     </>
   );
