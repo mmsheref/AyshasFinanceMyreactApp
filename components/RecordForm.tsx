@@ -375,10 +375,12 @@ const RecordForm: React.FC = () => {
                 <ChevronDownIcon className={`w-6 h-6 text-surface-on-variant dark:text-surface-on-variant-dark transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
               </button>
               
-              <div className={`transition-[max-height] duration-500 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px]' : 'max-h-0'}`}>
+              <div className={`transition-[max-height] duration-500 ease-in-out overflow-hidden ${isOpen ? 'max-h-[3000px]' : 'max-h-0'}`}>
                 <div className="px-4 pb-4">
                     <div className="h-px w-full bg-surface-outline/10 dark:bg-surface-outline-dark/10 mb-4"></div>
-                    <div className="space-y-6">
+                    
+                    {/* SCROLLABLE ITEM LIST */}
+                    <div className="space-y-6 max-h-[50vh] overflow-y-auto no-scrollbar pr-1 -mr-1">
                         {category.items.map((item) => {
                         const itemIndex = item.originalIndex;
                         return (
@@ -409,25 +411,26 @@ const RecordForm: React.FC = () => {
                             </div>
                         </div>
                         )})}
-                        
-                        <div className="flex gap-2 pt-2">
-                            <button 
-                                type="button" 
-                                onClick={() => { setNewItem({ name: '', categoryIndex: catIndex, saveForFuture: false, defaultValue: 0 }); setAddItemModalOpen(true); }} 
-                                className="flex-1 py-3 flex items-center justify-center text-sm font-medium text-primary dark:text-primary-dark bg-primary-container/30 dark:bg-primary-container-dark/30 hover:bg-primary-container/50 dark:hover:bg-primary-container-dark/50 rounded-full transition-colors">
-                            <PlusIcon className="w-4 h-4 mr-2"/> Add Item
-                            </button>
-                            {catIndex < formData.expenses.length - 1 && !isSearching && (
-                            <button
-                                type="button"
-                                onClick={() => handleGoToNextCategory(catIndex)}
-                                className="flex-1 py-3 flex items-center justify-center text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-high dark:bg-surface-dark-container-high hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest rounded-full transition-colors"
-                            >
-                                Next
-                                <ChevronRightIcon className="w-4 h-4 ml-2" />
-                            </button>
-                            )}
-                        </div>
+                    </div>
+                    
+                    {/* ACTION BUTTONS (fixed at bottom) */}
+                    <div className="flex gap-2 pt-4 border-t border-surface-outline/5 dark:border-surface-outline-dark/5 mt-4">
+                        <button 
+                            type="button" 
+                            onClick={() => { setNewItem({ name: '', categoryIndex: catIndex, saveForFuture: false, defaultValue: 0 }); setAddItemModalOpen(true); }} 
+                            className="flex-1 py-3 flex items-center justify-center text-sm font-medium text-primary dark:text-primary-dark bg-primary-container/30 dark:bg-primary-container-dark/30 hover:bg-primary-container/50 dark:hover:bg-primary-container-dark/50 rounded-full transition-colors">
+                        <PlusIcon className="w-4 h-4 mr-2"/> Add Item
+                        </button>
+                        {catIndex < formData.expenses.length - 1 && !isSearching && (
+                        <button
+                            type="button"
+                            onClick={() => handleGoToNextCategory(catIndex)}
+                            className="flex-1 py-3 flex items-center justify-center text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-high dark:bg-surface-dark-container-high hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest rounded-full transition-colors"
+                        >
+                            Next
+                            <ChevronRightIcon className="w-4 h-4 ml-2" />
+                        </button>
+                        )}
                     </div>
                 </div>
               </div>
