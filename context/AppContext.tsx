@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { DailyRecord, CustomExpenseStructure, BackupData, ReportCardVisibilitySettings } from '../types';
 import * as db from '../utils/db';
@@ -25,12 +26,16 @@ const DEFAULT_CARD_VISIBILITY: ReportCardVisibilitySettings = {
 interface AppContextType {
     records: DailyRecord[];
     sortedRecords: DailyRecord[];
+    allSortedRecords: DailyRecord[];
     customStructure: CustomExpenseStructure;
     foodCostCategories: string[];
     reportCardVisibility: ReportCardVisibilitySettings;
+    activeYear: string; // 'all' or 'YYYY'
+    availableYears: string[];
     isLoading: boolean;
     theme: Theme;
     setTheme: (theme: Theme) => void;
+    setActiveYear: (year: string) => Promise<void>;
     getRecordById: (id: string) => DailyRecord | undefined;
     handleSave: (record: DailyRecord, originalId?: string) => Promise<void>;
     handleDelete: (id: string) => Promise<void>;
@@ -48,6 +53,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [customStructure, setCustomStructure] = useState<CustomExpenseStructure>({});
     const [foodCostCategories, setFoodCostCategories] = useState<string[]>([]);
     const [reportCardVisibility, setReportCardVisibility] = useState<ReportCardVisibilitySettings>(DEFAULT_CARD_VISIBILITY);
+    const [activeYear, setActiveYearInternal] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
 
@@ -60,7 +66,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const storedStructure = localStorage.getItem('ayshas-custom-structure');
 
                 if (storedRecords) {
-                    console.log("Found data in localStorage, migrating to IndexedDB...");
                     const parsedRecords: DailyRecord[] = JSON.parse(storedRecords);
                     const { migratedRecords } = runMigration(parsedRecords);
 
@@ -72,13 +77,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     
                     await db.bulkAddRecords(migratedRecords);
                     await db.saveCustomStructure(finalStructure);
-
                     setRecords(migratedRecords);
                     setCustomStructure(finalStructure);
-
                     localStorage.removeItem('ayshas-records');
                     localStorage.removeItem('ayshas-custom-structure');
-                    console.log("Migration complete.");
                 } else {
                     const dbRecords = await db.getAllRecords();
                     const dbStructure = await db.getCustomStructure();
@@ -92,29 +94,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     }
                 }
 
-                // Load food cost categories setting
+                // Settings
                 const dbFoodCostCats = await db.getSetting('foodCostCategories');
-                if (dbFoodCostCats && Array.isArray(dbFoodCostCats)) {
-                    setFoodCostCategories(dbFoodCostCats);
-                } else {
-                    // Set a smarter default that excludes 'Diary Expenses'
-                    const defaultCats = ['Market Bills', 'Meat'];
-                    await db.saveSetting('foodCostCategories', defaultCats);
-                    setFoodCostCategories(defaultCats);
-                }
+                if (dbFoodCostCats) setFoodCostCategories(dbFoodCostCats);
+                else setFoodCostCategories(['Market Bills', 'Meat']);
 
-                // Load report card visibility setting
                 const dbCardVisibility = await db.getSetting('reportCardVisibility');
-                if (dbCardVisibility) {
-                    // Ensure new keys from default are added if they don't exist in saved settings
-                    setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
-                } else {
-                    await db.saveSetting('reportCardVisibility', DEFAULT_CARD_VISIBILITY);
-                    setReportCardVisibility(DEFAULT_CARD_VISIBILITY);
-                }
-                
+                if (dbCardVisibility) setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
+
+                const dbActiveYear = await db.getSetting('activeYear');
+                if (dbActiveYear) setActiveYearInternal(dbActiveYear);
+
             } catch (error) {
-                console.error("Failed to load data from database", error);
+                console.error("Failed to load data", error);
             } finally {
                 setIsLoading(false);
             }
@@ -125,65 +117,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     useEffect(() => {
         const root = window.document.documentElement;
-        const isDark =
-            theme === 'dark' ||
-            (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        
+        const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         root.classList.toggle('dark', isDark);
         localStorage.setItem('theme', theme);
-
-        if (theme === 'system') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            const handleChange = () => root.classList.toggle('dark', mediaQuery.matches);
-            mediaQuery.addEventListener('change', handleChange);
-            return () => mediaQuery.removeEventListener('change', handleChange);
-        }
     }, [theme]);
 
-
-    const sortedRecords = useMemo(() => 
-        [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    const allSortedRecords = useMemo(() => 
+        [...records].sort((a, b) => b.date.localeCompare(a.date)),
         [records]
     );
+
+    const availableYears = useMemo(() => {
+        const years = new Set<string>();
+        records.forEach(r => years.add(r.date.split('-')[0]));
+        return Array.from(years).sort((a, b) => b.localeCompare(a));
+    }, [records]);
+
+    const sortedRecords = useMemo(() => {
+        const base = activeYear === 'all' 
+            ? records 
+            : records.filter(r => r.date.startsWith(activeYear));
+        return [...base].sort((a, b) => b.date.localeCompare(a.date));
+    }, [records, activeYear]);
     
+    const setActiveYear = async (year: string) => {
+        await db.saveSetting('activeYear', year);
+        setActiveYearInternal(year);
+    };
+
     const getRecordById = (id: string) => records.find(r => r.id === id);
 
     const handleDelete = async (id: string) => {
         await db.deleteRecord(id);
-        setRecords(prevRecords => prevRecords.filter(r => r.id !== id));
+        setRecords(prev => prev.filter(r => r.id !== id));
     };
 
     const handleSave = async (record: DailyRecord, originalId?: string) => {
-        const newId = record.id;
-        // For a new record, originalId is undefined, so oldId will be the same as newId.
-        // For an existing record, originalId is provided.
-        const oldId = originalId || newId;
-
-        // Prevent saving if the new date is already taken by a *different* record.
-        if (newId !== oldId && records.some(r => r.id === newId)) {
-            // This is a server-side check; the form should prevent this state.
+        const oldId = originalId || record.id;
+        if (record.id !== oldId && records.some(r => r.id === record.id)) {
             throw new Error('A record for this date already exists.');
         }
-        
-        // If the ID (date) has changed during an edit, we must remove the old record.
-        if (newId !== oldId) {
-            await db.deleteRecord(oldId);
-        }
-        // 'put' operation in IndexedDB will add or update the record.
+        if (record.id !== oldId) await db.deleteRecord(oldId);
         await db.saveRecord(record);
-
-        setRecords(prevRecords => {
-            // Remove the old record if its ID has changed or if it existed.
-            const recordsWithoutOld = prevRecords.filter(r => r.id !== oldId);
-            // Add the new/updated record.
-            return [...recordsWithoutOld, record];
+        setRecords(prev => {
+            const others = prev.filter(r => r.id !== oldId);
+            return [...others, record];
         });
     };
     
     const handleSaveCustomItem = async (categoryName: string, itemName: string, defaultValue: number) => {
         const newStructure = { ...customStructure };
         if (newStructure[categoryName] && !newStructure[categoryName].some(item => item.name === itemName)) {
-            newStructure[categoryName] = [...newStructure[categoryName], { name: itemName, defaultValue: defaultValue }];
+            newStructure[categoryName] = [...newStructure[categoryName], { name: itemName, defaultValue }];
             await db.saveCustomStructure(newStructure);
             setCustomStructure(newStructure);
         }
@@ -192,16 +177,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const handleRestore = async (data: BackupData): Promise<number> => {
         const { migratedRecords } = runMigration(data.records);
         const migratedStructure = migrateStructure(data.customStructure);
-        
         await db.clearRecords();
         await db.bulkAddRecords(migratedRecords);
         await db.saveCustomStructure(migratedStructure);
-
         setRecords(migratedRecords);
         setCustomStructure(migratedStructure);
-        
-        alert(`Successfully imported ${data.records.length} records.`);
-
         return data.records.length;
     };
 
@@ -223,12 +203,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const value: AppContextType = {
         records,
         sortedRecords,
+        allSortedRecords,
         customStructure,
         foodCostCategories,
         reportCardVisibility,
+        activeYear,
+        availableYears,
         isLoading,
         theme,
         setTheme,
+        setActiveYear,
         getRecordById,
         handleSave,
         handleDelete,
@@ -244,8 +228,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useAppContext = () => {
     const context = useContext(AppContext);
-    if (!context) {
-        throw new Error('useAppContext must be used within an AppProvider');
-    }
+    if (!context) throw new Error('useAppContext must be used within an AppProvider');
     return context;
 };

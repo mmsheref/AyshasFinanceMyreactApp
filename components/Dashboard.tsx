@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExpenseProfitChart from './ExpenseProfitChart';
@@ -10,7 +11,7 @@ import { SparklesIcon, ChevronRightIcon } from './Icons';
 type FilterValue = '7D' | '30D' | '90D' | 'ALL' | 'CUSTOM';
 
 const Dashboard: React.FC = () => {
-  const { sortedRecords: records } = useAppContext();
+  const { sortedRecords: records, activeYear } = useAppContext();
   const navigate = useNavigate();
   
   const [activeFilter, setActiveFilter] = useState<FilterValue>('ALL');
@@ -22,38 +23,33 @@ const Dashboard: React.FC = () => {
     return records.filter(record => record.totalSales > 0);
   }, [records]);
 
-  // --- LOGIC FIX: Standardized String-Based Calculation ---
+  // Calculations for KPI Cards
   const {
     avg7DayProfit,
     avg30DayProfit,
-    totalProfitAllTime
+    totalProfitPeriod
   } = useMemo(() => {
     const todayStr = getTodayDateString();
-    // 7 Days inclusive (Today + 6 days back)
     const sevenDaysAgoStr = subtractDays(todayStr, 6); 
-    // 30 Days inclusive (Today + 29 days back)
     const thirtyDaysAgoStr = subtractDays(todayStr, 29);
 
     let total7Day = 0;
     let count7Day = 0;
     let total30Day = 0;
     let count30Day = 0;
-    let totalAll = 0;
+    let totalPeriod = 0;
 
     finishedRecords.forEach(r => {
         const expenses = calculateTotalExpenses(r);
         const profit = r.totalSales - expenses;
         
-        // All Time
-        totalAll += profit;
+        totalPeriod += profit;
 
-        // 7 Day Window
         if (r.date >= sevenDaysAgoStr && r.date <= todayStr) {
             total7Day += profit;
             count7Day++;
         }
 
-        // 30 Day Window
         if (r.date >= thirtyDaysAgoStr && r.date <= todayStr) {
             total30Day += profit;
             count30Day++;
@@ -63,13 +59,12 @@ const Dashboard: React.FC = () => {
     return {
       avg7DayProfit: count7Day > 0 ? total7Day / count7Day : 0,
       avg30DayProfit: count30Day > 0 ? total30Day / count30Day : 0,
-      totalProfitAllTime: totalAll,
+      totalProfitPeriod: totalPeriod,
     };
   }, [finishedRecords]);
   
   // Filter for Charts
   const filteredRecordsForCharts = useMemo(() => {
-      // Sort ascending for charts
       const ascendingRecords = [...finishedRecords].sort((a, b) => a.date.localeCompare(b.date)); 
       
       if (activeFilter === 'ALL') return ascendingRecords;
@@ -131,7 +126,9 @@ const Dashboard: React.FC = () => {
         </div>
         <h2 className="text-xl font-medium text-surface-on dark:text-surface-on-dark">Welcome, Aysha!</h2>
         <p className="text-surface-on-variant dark:text-surface-on-variant-dark mt-2 text-sm max-w-xs leading-relaxed">
-          Start tracking your restaurant's performance. Tap the <strong>+</strong> button to add your first record.
+          {activeYear === 'all' 
+            ? "Start tracking your restaurant's performance. Tap the + button to add your first record."
+            : `No records found for the fiscal year ${activeYear}. Select another year in settings or add a new record.`}
         </p>
       </div>
     );
@@ -188,16 +185,16 @@ const Dashboard: React.FC = () => {
         {/* Header */}
         <div>
             <h1 className="text-3xl font-normal text-surface-on dark:text-surface-on-dark">Dashboard</h1>
-            <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">Business Overview</p>
+            <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">{activeYear === 'all' ? 'Business Overview' : `Fiscal Year ${activeYear}`}</p>
         </div>
 
-        {/* Stats Grid - Fixed Spacing */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
              <div className="col-span-2">
                 <SummaryCard 
-                    value={totalProfitAllTime} 
-                    label="Total Net Profit" 
-                    subLabel={`All-time across ${finishedRecords.length} records`}
+                    value={totalProfitPeriod} 
+                    label={activeYear === 'all' ? "Total Net Profit" : `Profit for ${activeYear}`} 
+                    subLabel={activeYear === 'all' ? `All-time across ${finishedRecords.length} records` : `Across ${finishedRecords.length} records in ${activeYear}`}
                     highlight
                 />
             </div>
@@ -221,7 +218,7 @@ const Dashboard: React.FC = () => {
         <div className="flex overflow-x-auto no-scrollbar gap-2 py-1">
             <FilterChip label="7 Days" value="7D" active={activeFilter === '7D'} onClick={() => handleQuickFilterClick('7D')} />
             <FilterChip label="30 Days" value="30D" active={activeFilter === '30D'} onClick={() => handleQuickFilterClick('30D')} />
-            <FilterChip label="All Time" value="ALL" active={activeFilter === 'ALL'} onClick={() => handleQuickFilterClick('ALL')} />
+            <FilterChip label={activeYear === 'all' ? "All Time" : `Year ${activeYear}`} value="ALL" active={activeFilter === 'ALL'} onClick={() => handleQuickFilterClick('ALL')} />
             <FilterChip label="Custom" value="CUSTOM" active={activeFilter === 'CUSTOM'} onClick={() => handleQuickFilterClick('CUSTOM')} />
         </div>
 

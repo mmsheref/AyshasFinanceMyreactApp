@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BackupRestore from './BackupRestore';
 import { useAppContext } from '../context/AppContext';
 import ExpenseStructureManager from './ExpenseStructureManager';
-import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon } from './Icons';
+import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon, CalendarIcon } from './Icons';
 import Modal from './Modal';
 import { ReportMetric, ReportCardVisibilitySettings, CustomExpenseStructure } from '../types';
 import { METRIC_LABELS } from '../constants';
@@ -96,6 +97,42 @@ const Switch: React.FC<{ checked: boolean, onChange: (checked: boolean) => void 
     );
 };
 
+const YearPicker: React.FC<{onClose: () => void}> = ({ onClose }) => {
+    const { availableYears, activeYear, setActiveYear } = useAppContext();
+    
+    const handleSelect = async (year: string) => {
+        await setActiveYear(year);
+        onClose();
+    };
+
+    return (
+        <Modal onClose={onClose}>
+            <div className="bg-surface-container dark:bg-surface-dark-container rounded-[28px] p-6">
+                <h2 className="text-xl font-medium text-surface-on dark:text-surface-on-dark mb-4">Select Fiscal Year</h2>
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                    <button 
+                        onClick={() => handleSelect('all')}
+                        className={`w-full text-left p-4 rounded-xl transition-colors ${activeYear === 'all' ? 'bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark' : 'bg-surface-container-high dark:bg-surface-dark-container-high text-surface-on dark:text-surface-on-dark'}`}
+                    >
+                        <p className="font-bold">All Records</p>
+                        <p className="text-xs opacity-70">View all financial history</p>
+                    </button>
+                    {availableYears.map(year => (
+                        <button 
+                            key={year}
+                            onClick={() => handleSelect(year)}
+                            className={`w-full text-left p-4 rounded-xl transition-colors ${activeYear === year ? 'bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark' : 'bg-surface-container-high dark:bg-surface-dark-container-high text-surface-on dark:text-surface-on-dark'}`}
+                        >
+                            <p className="font-bold">{year}</p>
+                            <p className="text-xs opacity-70">Fiscal year {year}</p>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const FoodCostCategoryManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
     const { foodCostCategories, customStructure, handleUpdateFoodCostCategories } = useAppContext();
     const [internalSelection, setInternalSelection] = useState<string[]>(foodCostCategories);
@@ -155,12 +192,13 @@ const ReportCardManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
 };
 
 const SettingsPage: React.FC = () => {
-    const { records, customStructure, handleRestore, handleUpdateStructure } = useAppContext();
+    const { records, customStructure, activeYear, handleRestore, handleUpdateStructure } = useAppContext();
     const navigate = useNavigate();
     const [isStructureModalOpen, setStructureModalOpen] = useState(false);
     const [isFoodCostModalOpen, setFoodCostModalOpen] = useState(false);
     const [isReportCardModalOpen, setReportCardModalOpen] = useState(false);
     const [isAboutModalOpen, setAboutModalOpen] = useState(false);
+    const [isYearModalOpen, setYearModalOpen] = useState(false);
 
     const onStructureUpdate = async (newStructure: CustomExpenseStructure) => {
         await handleUpdateStructure(newStructure);
@@ -175,7 +213,8 @@ const SettingsPage: React.FC = () => {
             </div>
 
             <SettingsGroup title="General">
-                 <SettingsItem icon={<PaintBrushIcon className="w-5 h-5"/>} title="Theme" description="Appearance">
+                <SettingsItem icon={<CalendarIcon className="w-5 h-5"/>} title="Reporting Period" description={activeYear === 'all' ? 'Showing all records' : `Active Fiscal Year: ${activeYear}`} onClick={() => setYearModalOpen(true)} />
+                <SettingsItem icon={<PaintBrushIcon className="w-5 h-5"/>} title="Theme" description="Appearance">
                     <ThemeSwitcher />
                 </SettingsItem>
             </SettingsGroup>
@@ -214,6 +253,7 @@ const SettingsPage: React.FC = () => {
                 </Modal>
             )}
 
+            {isYearModalOpen && <YearPicker onClose={() => setYearModalOpen(false)} />}
             {isFoodCostModalOpen && <FoodCostCategoryManager onClose={() => setFoodCostModalOpen(false)} />}
             {isReportCardModalOpen && <ReportCardManager onClose={() => setReportCardModalOpen(false)} />}
             

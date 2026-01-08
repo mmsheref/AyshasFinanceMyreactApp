@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { DailyRecord, ExpenseCategory } from '../types';
 
@@ -18,18 +19,17 @@ const CategoryCard: React.FC<{ category: ExpenseCategory }> = ({ category }) => 
 
     if (itemsWithAmount.length === 0) return null;
 
-    // Use `break-inside-avoid` to prevent the card from splitting across columns.
     return (
-        <div className="break-inside-avoid mb-4">
-            <h4 className="text-sm font-semibold text-gray-800 bg-gray-100 p-2 rounded-t-md flex justify-between">
+        <div className="mb-4">
+            <h4 className="text-sm font-semibold text-slate-800 bg-slate-100 p-2 rounded-t-md flex justify-between">
                 <span className="pr-2">{category.name}</span>
                 <span>₹{categoryTotal.toLocaleString('en-IN')}</span>
             </h4>
-            <ul className="border border-t-0 border-gray-200 rounded-b-md">
+            <ul className="border border-t-0 border-slate-200 rounded-b-md bg-white">
                 {itemsWithAmount.map((item, index) => (
-                    <li key={item.id} className={`px-2 py-1 flex justify-between items-center text-xs ${index < itemsWithAmount.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <span className="text-gray-700 pr-2 break-words">{item.name}</span>
-                        <span className="font-medium text-gray-800 flex-shrink-0">₹{item.amount.toLocaleString('en-IN')}</span>
+                    <li key={item.id} className={`px-2 py-1 flex justify-between items-center text-xs ${index < itemsWithAmount.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                        <span className="text-slate-700 pr-2 break-words">{item.name}</span>
+                        <span className="font-medium text-slate-900 flex-shrink-0">₹{item.amount.toLocaleString('en-IN')}</span>
                     </li>
                 ))}
             </ul>
@@ -47,49 +47,49 @@ const ShareableReport: React.FC<ShareableReportProps> = ({ record, id }) => {
     category.items.reduce((sum, item) => sum + item.amount, 0) > 0
   );
   
-  // Note: We use strict standard colors (gray, white) here regardless of the app's theme
-  // because this component is rendered off-screen specifically for image generation,
-  // and we want the generated report to look like a clean, standard document (light mode)
-  // regardless of user's dark mode setting.
+  // We use fixed Slate/Gray/White colors here to ensure the report always looks the same
+  // regardless of the app's current dark/light mode setting. html2canvas will capture
+  // this specifically styled container.
   return (
-    <div id={id} className="p-6 bg-white font-sans text-gray-800" style={{ width: '680px' }}>
-      <div className="text-center pb-4 mb-4 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-purple-700">Ayshas Finance Tracker Report</h1>
-        <p className="text-md text-gray-600 mt-1">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    <div id={id} className="p-8 bg-white font-sans text-slate-900" style={{ width: '800px' }}>
+      <div className="text-center pb-6 mb-6 border-b-2 border-slate-100">
+        <h1 className="text-2xl font-bold text-indigo-700">Ayshas Finance Tracker Report</h1>
+        <p className="text-lg text-slate-500 mt-1">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 text-center mb-6">
-        <div className="bg-gray-50 p-3 rounded-lg flex flex-col justify-between">
+      <div className="grid grid-cols-3 gap-6 text-center mb-8">
+        <div className="bg-slate-50 p-4 rounded-xl flex flex-col justify-between border border-slate-100">
             <div>
-              <p className="text-xs font-medium text-gray-600">Total Sales</p>
-              <p className="text-xl font-bold text-purple-700">₹{record.totalSales.toLocaleString('en-IN')}</p>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Sales</p>
+              <p className="text-2xl font-bold text-indigo-700">₹{record.totalSales.toLocaleString('en-IN')}</p>
             </div>
-             <div className="text-[10px] space-y-0.5 text-left border-t border-gray-200 pt-1.5 mt-1.5">
-                <p className="flex justify-between"><span>Morning:</span> <span className="font-semibold text-gray-800">₹{morningSales.toLocaleString('en-IN')}</span></p>
-                <p className="flex justify-between"><span>Night:</span> <span className="font-semibold text-gray-800">₹{nightSales.toLocaleString('en-IN')}</span></p>
+             <div className="text-[11px] space-y-0.5 text-left border-t border-slate-200 pt-2 mt-2">
+                <p className="flex justify-between"><span>Morning:</span> <span className="font-semibold text-slate-800">₹{morningSales.toLocaleString('en-IN')}</span></p>
+                <p className="flex justify-between"><span>Night:</span> <span className="font-semibold text-slate-800">₹{nightSales.toLocaleString('en-IN')}</span></p>
             </div>
         </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs font-medium text-gray-600">Total Expenses</p>
-          <p className="text-xl font-bold text-red-600">₹{totalExpenses.toLocaleString('en-IN')}</p>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Expenses</p>
+          <p className="text-2xl font-bold text-rose-600">₹{totalExpenses.toLocaleString('en-IN')}</p>
         </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs font-medium text-gray-600">{profit >= 0 ? 'Profit' : 'Loss'}</p>
-          <p className={`text-xl font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>₹{Math.abs(profit).toLocaleString('en-IN')}</p>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{profit >= 0 ? 'Profit' : 'Loss'}</p>
+          <p className={`text-2xl font-bold ${profit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>₹{Math.abs(profit).toLocaleString('en-IN')}</p>
         </div>
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-gray-800 text-center mb-4">Expense Breakdown</h3>
-        <div className="text-left" style={{ columnCount: 2, columnGap: '1rem' }}>
+        <h3 className="text-center text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-6">Expense Breakdown</h3>
+        {/* Using standard Grid for layout consistency in html2canvas */}
+        <div className="grid grid-cols-2 gap-x-6 items-start">
           {categoriesWithExpenses.map(category => (
             <CategoryCard key={category.id} category={category} />
           ))}
         </div>
       </div>
 
-       <div className="text-center mt-6 pt-3 border-t border-gray-200 text-xs text-gray-400">
-        <p>Generated by Ayshas Finance Tracker</p>
+       <div className="text-center mt-8 pt-4 border-t border-slate-100 text-[10px] text-slate-300">
+        <p>Generated by Ayshas Finance Tracker • All figures in INR (₹)</p>
       </div>
     </div>
   );

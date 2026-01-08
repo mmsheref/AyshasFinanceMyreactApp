@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
@@ -29,7 +30,6 @@ const RecordDetail: React.FC = () => {
     const generateAndShareImage = async () => {
       const wrapper = document.getElementById('share-report-wrapper');
       const elementToCapture = document.getElementById('share-report-source');
-      const isDarkMode = document.documentElement.classList.contains('dark');
 
       if (!wrapper || !elementToCapture) {
         alert('Failed to prepare report for sharing.');
@@ -39,14 +39,12 @@ const RecordDetail: React.FC = () => {
       }
 
       try {
-        // Temporarily apply dark mode to wrapper if needed for capture
-        if (isDarkMode) {
-          wrapper.classList.add('dark');
-        }
-
+        // html2canvas captures the element's current state. 
+        // We ensure the wrapper is hidden and not affected by the 'dark' class on <html>.
         const canvas = await html2canvas(elementToCapture, { 
           scale: 2, 
           useCORS: true,
+          backgroundColor: '#ffffff', // Force white background for the canvas
         });
 
         const base64Data = canvas.toDataURL('image/png');
@@ -59,10 +57,6 @@ const RecordDetail: React.FC = () => {
         console.error('Error sharing report:', error);
         alert('An error occurred while sharing.');
       } finally {
-        // Clean up class and state
-        if (isDarkMode) {
-          wrapper.classList.remove('dark');
-        }
         setIsSharing(false);
         setIsPreparingShare(false);
       }
