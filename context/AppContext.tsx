@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { DailyRecord, CustomExpenseStructure, BackupData, ReportCardVisibilitySettings } from '../types';
 import * as db from '../utils/db';
 import { migrateStructure, runMigration } from '../utils/migrations';
-import { DEFAULT_EXPENSE_STRUCTURE } from '../constants';
+import { DEFAULT_EXPENSE_STRUCTURE, CATEGORIES_WITH_BILL_UPLOAD } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
 
 type Theme = 'light' | 'dark' | 'system';
@@ -29,6 +29,7 @@ interface AppContextType {
     allSortedRecords: DailyRecord[];
     customStructure: CustomExpenseStructure;
     foodCostCategories: string[];
+    billUploadCategories: string[];
     reportCardVisibility: ReportCardVisibilitySettings;
     activeYear: string; // 'all' or 'YYYY'
     availableYears: string[];
@@ -43,6 +44,7 @@ interface AppContextType {
     handleUpdateStructure: (newStructure: CustomExpenseStructure) => Promise<void>;
     handleSaveCustomItem: (categoryName: string, itemName: string, defaultValue: number) => Promise<void>;
     handleUpdateFoodCostCategories: (newCategories: string[]) => Promise<void>;
+    handleUpdateBillUploadCategories: (newCategories: string[]) => Promise<void>;
     handleUpdateReportCardVisibility: (newVisibility: ReportCardVisibilitySettings) => Promise<void>;
 }
 
@@ -52,6 +54,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [records, setRecords] = useState<DailyRecord[]>([]);
     const [customStructure, setCustomStructure] = useState<CustomExpenseStructure>({});
     const [foodCostCategories, setFoodCostCategories] = useState<string[]>([]);
+    const [billUploadCategories, setBillUploadCategories] = useState<string[]>([]);
     const [reportCardVisibility, setReportCardVisibility] = useState<ReportCardVisibilitySettings>(DEFAULT_CARD_VISIBILITY);
     const [activeYear, setActiveYearInternal] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
@@ -98,6 +101,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const dbFoodCostCats = await db.getSetting('foodCostCategories');
                 if (dbFoodCostCats) setFoodCostCategories(dbFoodCostCats);
                 else setFoodCostCategories(['Market Bills', 'Meat']);
+
+                const dbBillUploadCats = await db.getSetting('billUploadCategories');
+                if (dbBillUploadCats) setBillUploadCategories(dbBillUploadCats);
+                else setBillUploadCategories(CATEGORIES_WITH_BILL_UPLOAD);
 
                 const dbCardVisibility = await db.getSetting('reportCardVisibility');
                 if (dbCardVisibility) setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
@@ -195,6 +202,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setFoodCostCategories(newCategories);
     };
 
+    const handleUpdateBillUploadCategories = async (newCategories: string[]) => {
+        await db.saveSetting('billUploadCategories', newCategories);
+        setBillUploadCategories(newCategories);
+    };
+
     const handleUpdateReportCardVisibility = async (newVisibility: ReportCardVisibilitySettings) => {
         await db.saveSetting('reportCardVisibility', newVisibility);
         setReportCardVisibility(newVisibility);
@@ -206,6 +218,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         allSortedRecords,
         customStructure,
         foodCostCategories,
+        billUploadCategories,
         reportCardVisibility,
         activeYear,
         availableYears,
@@ -220,6 +233,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         handleUpdateStructure,
         handleSaveCustomItem,
         handleUpdateFoodCostCategories,
+        handleUpdateBillUploadCategories,
         handleUpdateReportCardVisibility,
     };
 

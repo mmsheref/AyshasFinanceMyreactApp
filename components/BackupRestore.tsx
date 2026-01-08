@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { DailyRecord, CustomExpenseStructure, BackupData } from '../types';
 import FileImportModal from './FileImportModal';
@@ -5,6 +6,7 @@ import { DownloadIcon, UploadIcon, ShareIcon } from './Icons';
 import { saveBackupFile, shareBackupData, saveCsvFile } from '../utils/capacitor-utils';
 import { convertToCSV } from '../utils/csv-utils';
 import { isBackupData, isDailyRecord } from '../utils/validation-utils';
+import { isBackupOlderThanCurrent } from '../utils/record-utils';
 
 interface BackupRestoreProps {
   allRecords: DailyRecord[];
@@ -75,23 +77,7 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
         const data = JSON.parse(text);
 
         const processData = (backupData: BackupData) => {
-            if (allRecords.length > 0 && backupData.records.length > 0) {
-                // Use string comparison for dates to avoid timezone issues.
-                // The 'YYYY-MM-DD' format is lexicographically sortable.
-                const sortedAppRecords = [...allRecords].sort((a, b) => b.date.localeCompare(a.date));
-                const newestAppRecordDateStr = sortedAppRecords[0].date;
-
-                const sortedBackupRecords = [...backupData.records].sort((a, b) => b.date.localeCompare(a.date));
-                const newestBackupRecordDateStr = sortedBackupRecords[0].date;
-
-                if (newestBackupRecordDateStr < newestAppRecordDateStr) {
-                    setIsOldBackup(true);
-                } else {
-                    setIsOldBackup(false);
-                }
-            } else {
-                setIsOldBackup(false);
-            }
+            setIsOldBackup(isBackupOlderThanCurrent(allRecords, backupData));
             setRecordsToImport(backupData);
         };
 

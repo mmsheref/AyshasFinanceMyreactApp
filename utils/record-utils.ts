@@ -1,5 +1,5 @@
 
-import { DailyRecord } from '../types';
+import { DailyRecord, BackupData } from '../types';
 
 /**
  * Calculates the total expenses for a given daily record.
@@ -124,4 +124,24 @@ export const formatIndianNumberCompact = (amount: number): string => {
         return `${(amount / 100000).toFixed(2)} Lakh`;
     }
     return amount.toLocaleString('en-IN');
+};
+
+/**
+ * Determines if the backup data is older than the current application data based on the latest record date.
+ * @param currentRecords - The records currently in the app.
+ * @param backupData - The backup data being imported.
+ * @returns True if the backup's latest record is older than the app's latest record.
+ */
+export const isBackupOlderThanCurrent = (currentRecords: DailyRecord[], backupData: BackupData): boolean => {
+    if (currentRecords.length === 0) return false;
+    if (backupData.records.length === 0) return false;
+
+    // Sort to find latest dates (Desc)
+    // Note: Assuming dates are YYYY-MM-DD, string comparison works.
+    const getLatestDate = (list: DailyRecord[]) => list.reduce((max, r) => r.date > max ? r.date : max, list[0].date);
+
+    const appLatestDate = getLatestDate(currentRecords);
+    const backupLatestDate = getLatestDate(backupData.records);
+
+    return backupLatestDate < appLatestDate;
 };

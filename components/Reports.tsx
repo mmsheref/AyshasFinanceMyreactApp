@@ -148,6 +148,11 @@ const Reports: React.FC = () => {
         });
     }, [filter, dateRange, finishedRecords]);
 
+    // Create a sorted copy of filtered records once to avoid repeated sorting in chart data
+    const sortedFilteredRecords = useMemo(() => {
+        return [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date));
+    }, [filteredRecords]);
+
     const reportData = useMemo(() => {
         let totalSales = 0;
         let totalExpenses = 0;
@@ -323,9 +328,7 @@ const Reports: React.FC = () => {
     };
 
     const chartData = useMemo(() => {
-        // Sort ascending for chart
-        const ascendingRecords = [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date));
-        return ascendingRecords.map(r => {
+        return sortedFilteredRecords.map(r => {
             const totalExpenses = calculateTotalExpenses(r);
             const totalSales = r.totalSales || 0;
             return {
@@ -335,11 +338,10 @@ const Reports: React.FC = () => {
                 profit: totalSales - totalExpenses,
             };
         });
-    }, [filteredRecords]);
+    }, [sortedFilteredRecords]);
 
     const salesChartData = useMemo(() => {
-        const ascendingRecords = [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date));
-        return ascendingRecords.map(r => {
+        return sortedFilteredRecords.map(r => {
             const morningSales = r.morningSales || 0;
             const totalSales = r.totalSales || 0;
             const nightSales = totalSales - morningSales;
@@ -350,7 +352,7 @@ const Reports: React.FC = () => {
                 totalSales,
             };
         });
-    }, [filteredRecords]);
+    }, [sortedFilteredRecords]);
 
     const handleFilterChange = (newFilter: FilterPreset) => {
         setFilter(newFilter);

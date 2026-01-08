@@ -17,7 +17,7 @@ import FileImportModal from './components/FileImportModal';
 import Modal from './components/Modal';
 import { BackupData } from './types';
 import { isBackupData } from './utils/validation-utils';
-import { WarningIcon } from './components/Icons'; // Import an icon
+import { isBackupOlderThanCurrent } from './utils/record-utils';
 
 const ROOT_ROUTES = ['/', '/records', '/reports', '/settings'];
 
@@ -53,7 +53,6 @@ const AppRoutes: React.FC = () => {
 const ExitConfirmModal: React.FC<{ onConfirm: () => void, onCancel: () => void }> = ({ onConfirm, onCancel }) => (
     <Modal onClose={onCancel} size="alert">
         <div className="p-6 pb-2 text-center">
-             {/* Icon (Optional but good for visual anchor) */}
              <div className="flex justify-center mb-4 text-secondary dark:text-secondary-dark">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
@@ -65,7 +64,6 @@ const ExitConfirmModal: React.FC<{ onConfirm: () => void, onCancel: () => void }
                  Are you sure you want to close Ayshas Finance Tracker?
              </p>
         </div>
-        {/* Actions - Right Aligned Text Buttons */}
         <div className="p-6 pt-2 flex justify-end gap-2">
             <button 
                 onClick={onCancel} 
@@ -84,7 +82,7 @@ const ExitConfirmModal: React.FC<{ onConfirm: () => void, onCancel: () => void }
 );
 
 const App: React.FC = () => {
-  const { isLoading, handleRestore, sortedRecords } = useContext(AppContext);
+  const { isLoading, handleRestore, records } = useContext(AppContext);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<BackupData | null>(null);
@@ -129,7 +127,7 @@ const App: React.FC = () => {
     };
   }, [location.pathname, showExitModal, pendingImportData, navigate]);
 
-  // --- JSON File Import Listener ---
+  // --- JSON File Import Listener (Native) ---
   useEffect(() => {
     const listenerPromise = CapacitorApp.addListener('appUrlOpen', async (event) => {
       const url = event.url;
@@ -147,20 +145,7 @@ const App: React.FC = () => {
         const data = await response.json();
 
         if (isBackupData(data)) {
-            if (sortedRecords.length > 0 && data.records.length > 0) {
-                const newestAppRecordDateStr = sortedRecords[0].date;
-                const sortedBackupRecords = [...data.records].sort((a, b) => b.date.localeCompare(a.date));
-                const newestBackupRecordDateStr = sortedBackupRecords[0].date;
-
-                if (newestBackupRecordDateStr < newestAppRecordDateStr) {
-                    setIsOldBackup(true);
-                } else {
-                    setIsOldBackup(false);
-                }
-            } else {
-                setIsOldBackup(false);
-            }
-
+            setIsOldBackup(isBackupOlderThanCurrent(records, data));
             setPendingImportData(data);
         } else {
             alert('The selected file is not a valid backup file for this application.');
@@ -175,7 +160,7 @@ const App: React.FC = () => {
         listenerPromise.then(listener => listener.remove())
             .catch(e => console.error('Failed to remove appUrlOpen listener', e));
     };
-  }, [sortedRecords]);
+  }, [records]);
 
   const handleOnboardingFinish = () => {
     localStorage.setItem('hasOnboarded', 'true');

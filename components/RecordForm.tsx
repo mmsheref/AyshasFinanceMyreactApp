@@ -3,20 +3,38 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { DailyRecord } from '../types';
-import { generateNewRecordExpenses, CATEGORIES_WITH_BILL_UPLOAD } from '../constants';
+import { generateNewRecordExpenses } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import ImageUpload from './ImageUpload';
 import Modal from './Modal';
 import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon, SearchIcon, ChevronRightIcon } from './Icons';
 
-// Material Outlined Input Component - Moved OUTSIDE to prevent focus loss bugs
-const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = "text", placeholder = "", prefix, parentBg = "bg-surface-container", ...props }: any) => {
+interface OutlinedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    label: string;
+    prefix?: boolean;
+    parentBg?: string;
+}
+
+// Material Outlined Input Component (Used for Sales Inputs)
+const OutlinedInput: React.FC<OutlinedInputProps> = ({ 
+    label, 
+    id, 
+    value, 
+    onChange, 
+    type = "text", 
+    inputMode = "text", 
+    placeholder = "", 
+    prefix, 
+    parentBg = "bg-surface-container", 
+    className,
+    ...props 
+}) => {
     const labelBgClass = parentBg === "bg-surface-container" 
       ? "bg-surface-container dark:bg-surface-dark-container" 
       : parentBg;
 
     return (
-    <div className="relative group">
+    <div className={`relative group ${className || ''}`}>
         <input
             type={type}
             id={id}
@@ -57,10 +75,10 @@ const RecordForm: React.FC = () => {
   const { 
     getRecordById, 
     handleSave, 
-    sortedRecords, 
     customStructure, 
     handleSaveCustomItem,
-    records: allRecords
+    records: allRecords,
+    billUploadCategories
   } = useAppContext();
   
   const isEditing = !!recordId;
@@ -76,6 +94,9 @@ const RecordForm: React.FC = () => {
   const [expenseSearchTerm, setExpenseSearchTerm] = useState('');
   const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const footerRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+
+  const isSearching = expenseSearchTerm.trim().length > 0;
 
   useEffect(() => {
     const initializeForm = () => {
@@ -94,7 +115,8 @@ const RecordForm: React.FC = () => {
         setFormData({
           id: today, date: today, totalSales: 0, morningSales: 0, expenses: newExpenses, isClosed: false
         });
-        setOpenCategory(localStorage.getItem('ayshas-last-open-category') || newExpenses[0]?.name || null);
+        // Don't auto-open category on mount to keep UI clean initially
+        setOpenCategory(null);
       }
     };
     initializeForm();
@@ -119,7 +141,7 @@ const RecordForm: React.FC = () => {
   
   const profit = useMemo(() => {
     if (!formData) return 0;
-    if (formData.isClosed) return -totalExpenses; // If closed, profit is just negative expenses
+    if (formData.isClosed) return -totalExpenses; 
     return (formData.totalSales || 0) - totalExpenses;
   }, [formData?.totalSales, totalExpenses, formData?.isClosed]);
 
@@ -178,8 +200,6 @@ const RecordForm: React.FC = () => {
         return {
             ...prev,
             isClosed: checked,
-            // Optional: Clear sales if marked as closed? Or just visually hide them.
-            // Let's set them to 0 to ensure consistency.
             totalSales: checked ? 0 : prev.totalSales,
             morningSales: checked ? 0 : prev.morningSales
         };
@@ -238,11 +258,7 @@ const RecordForm: React.FC = () => {
     setNewCategoryName('');
 
     setTimeout(() => {
-      setOpenCategory(trimmedName);
-      const newCategoryRef = categoryRefs.current[trimmedName];
-      if (newCategoryRef) {
-          newCategoryRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      toggleCategory(trimmedName);
     }, 100);
   };
 
@@ -264,11 +280,40 @@ const RecordForm: React.FC = () => {
     navigate(`/records/${formData.id}`);
   };
 
+  const scrollToCategory = (categoryName: string) => {
+      // Small delay to allow the accordion animation to start/layout to update
+      setTimeout(() => {
+          const element = categoryRefs.current[categoryName];
+          if (!element) return;
+
+          // Calculate where the element should be.
+          // App Header is 64px.
+          // Sticky Search Header is approx 110px.
+          // We want the category header to sit just below the sticky search header.
+          const stickyOffset = (stickyHeaderRef.current?.offsetHeight || 110) + 64; 
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.scrollY - stickyOffset - 10; // 10px buffer
+
+          window.scrollTo({
+              top: offsetPosition,
+              behavior: "smooth"
+          });
+      }, 300);
+  };
+
   const toggleCategory = (categoryName: string) => {
-    const newOpenCategory = openCategory !== categoryName ? categoryName : null;
+    if (isSearching) return;
+    const isOpening = openCategory !== categoryName;
+    const newOpenCategory = isOpening ? categoryName : null;
+    
     setOpenCategory(newOpenCategory);
-    if (newOpenCategory) localStorage.setItem('ayshas-last-open-category', newOpenCategory);
-    else localStorage.removeItem('ayshas-last-open-category');
+    
+    if (isOpening) {
+        scrollToCategory(categoryName);
+        localStorage.setItem('ayshas-last-open-category', categoryName);
+    } else {
+        localStorage.removeItem('ayshas-last-open-category');
+    }
   };
 
   const handleGoToNextCategory = (currentCatIndex: number) => {
@@ -276,57 +321,8 @@ const RecordForm: React.FC = () => {
     const nextCategory = formData.expenses[currentCatIndex + 1];
     if (nextCategory) {
         toggleCategory(nextCategory.name);
-        setTimeout(() => {
-            const nextCategoryRef = categoryRefs.current[nextCategory.name];
-            if (nextCategoryRef) {
-                nextCategoryRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }, 300);
     }
   };
-  
-  const scrollInputIntoView = (inputElement: HTMLInputElement) => {
-    if (!inputElement) return;
-    requestAnimationFrame(() => {
-        const footer = footerRef.current;
-        const header = document.querySelector('header');
-        if (!footer || !header) return;
-        const footerHeight = footer.offsetHeight;
-        const headerHeight = header.offsetHeight;
-        const inputRect = inputElement.getBoundingClientRect();
-        const PADDING = 20; 
-        let scrollAdjustment = 0;
-        if (inputRect.bottom > (window.innerHeight - footerHeight)) {
-            scrollAdjustment = inputRect.bottom - (window.innerHeight - footerHeight) + PADDING;
-        } 
-        else if (inputRect.top < headerHeight) {
-            scrollAdjustment = inputRect.top - headerHeight - PADDING;
-        }
-        if (scrollAdjustment !== 0) {
-            window.scrollBy({ top: scrollAdjustment, behavior: 'smooth' });
-        }
-    });
-  };
-
-  const handleExpenseKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' && e.keyCode !== 13) return;
-    e.preventDefault();
-    const allVisibleInputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>('input[data-expense-input="true"]')
-    );
-    const currentInput = e.target as HTMLInputElement;
-    const currentIndex = allVisibleInputs.findIndex(input => input.id === currentInput.id);
-    if (currentIndex > -1 && currentIndex < allVisibleInputs.length - 1) {
-      const nextInput = allVisibleInputs[currentIndex + 1];
-      nextInput.focus();
-      nextInput.select();
-      scrollInputIntoView(nextInput);
-    } else {
-      currentInput.blur();
-    }
-  };
-
-  const isSearching = expenseSearchTerm.trim().length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pb-44">
@@ -378,20 +374,23 @@ const RecordForm: React.FC = () => {
 
       {/* Expenses Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-            <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark">Expenses</h3>
-            <div className="text-sm font-bold text-error dark:text-error-dark">Total: ₹{totalExpenses.toLocaleString('en-IN')}</div>
-        </div>
-        
-        <div className="relative">
-            <input
-                type="text"
-                placeholder="Find expense..."
-                value={expenseSearchTerm}
-                onChange={(e) => setExpenseSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-surface-container-high dark:bg-surface-dark-container-high rounded-full border-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant dark:placeholder-surface-on-variant-dark"
-            />
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark" />
+        {/* Sticky Header Wrapper */}
+        <div ref={stickyHeaderRef} className="sticky top-[64px] z-20 bg-surface dark:bg-surface-dark pt-2 pb-3 -mx-4 px-4 shadow-sm transition-colors">
+            <div className="flex items-center justify-between px-1 mb-2">
+                <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark">Expenses</h3>
+                <div className="text-sm font-bold text-error dark:text-error-dark">Total: ₹{totalExpenses.toLocaleString('en-IN')}</div>
+            </div>
+            
+            <div className="relative">
+                <input
+                    type="text"
+                    placeholder="Find expense..."
+                    value={expenseSearchTerm}
+                    onChange={(e) => setExpenseSearchTerm(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-surface-container-high dark:bg-surface-dark-container-high rounded-full border-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant dark:placeholder-surface-on-variant-dark"
+                />
+                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark" />
+            </div>
         </div>
 
         {filteredExpenses.map((category) => {
@@ -404,11 +403,11 @@ const RecordForm: React.FC = () => {
             <div 
                 key={category.id} 
                 ref={el => { if (el) categoryRefs.current[category.name] = el }} 
-                className={`rounded-[20px] overflow-hidden transition-all duration-300 border border-surface-outline/10 dark:border-surface-outline-dark/10 ${isOpen ? 'bg-surface-container dark:bg-surface-dark-container shadow-sm' : 'bg-surface-container dark:bg-surface-dark-container'}`}
+                className={`rounded-[20px] overflow-hidden transition-all duration-300 border border-surface-outline/10 dark:border-surface-outline-dark/10 ${isOpen ? 'bg-surface-container dark:bg-surface-dark-container shadow-sm ring-1 ring-primary/20 dark:ring-primary-dark/20' : 'bg-surface-container dark:bg-surface-dark-container'}`}
             >
               <button type="button" onClick={() => toggleCategory(category.name)} className="w-full flex justify-between items-center p-4 text-left active:bg-surface-container-high dark:active:bg-surface-dark-container-high" aria-expanded={isOpen} disabled={isSearching}>
                 <div className="flex flex-col">
-                  <span className="text-base font-medium text-surface-on dark:text-surface-on-dark">{category.name}</span>
+                  <span className={`text-base font-medium ${isOpen ? 'text-primary dark:text-primary-dark' : 'text-surface-on dark:text-surface-on-dark'}`}>{category.name}</span>
                   <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-0.5">₹{categoryTotal.toLocaleString('en-IN')}</span>
                 </div>
                 <ChevronDownIcon className={`w-6 h-6 text-surface-on-variant dark:text-surface-on-variant-dark transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
@@ -416,35 +415,51 @@ const RecordForm: React.FC = () => {
               
               <div className={`transition-[max-height] duration-500 ease-in-out overflow-hidden ${isOpen ? 'max-h-[3000px]' : 'max-h-0'}`}>
                 <div className="px-4 pb-4">
-                    <div className="h-px w-full bg-surface-outline/10 dark:bg-surface-outline-dark/10 mb-4"></div>
+                    <div className="h-px w-full bg-surface-outline/10 dark:bg-surface-outline-dark/10 mb-2"></div>
                     
                     {/* SCROLLABLE ITEM LIST */}
-                    <div className="space-y-6 max-h-[50vh] overflow-y-auto no-scrollbar pr-1 -mr-1">
+                    <div className="space-y-0">
                         {category.items.map((item) => {
                         const itemIndex = item.originalIndex;
                         return (
-                        <div key={item.id} className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <label htmlFor={`${category.id}-${item.id}`} className="text-sm font-medium text-surface-on dark:text-surface-on-dark">{item.name}</label>
-                                <button type="button" onClick={() => setDeleteConfirmation({catIndex, itemIndex, itemName: item.name})} className="p-2 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark active:bg-error-container/20 rounded-full" aria-label={`Remove ${item.name}`}>
-                                    <TrashIcon className="w-4 h-4"/>
-                                </button>
+                        <div key={item.id} className="group flex items-center gap-3 py-3 border-b border-surface-outline/5 dark:border-surface-outline-dark/5 last:border-0">
+                            
+                            {/* Name & Delete - Left Side */}
+                            <div className="flex-grow min-w-0 mr-1">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor={`${category.id}-${item.id}`} className="text-sm font-medium text-surface-on dark:text-surface-on-dark cursor-pointer select-none">
+                                        {item.name}
+                                    </label>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setDeleteConfirmation({catIndex, itemIndex, itemName: item.name})} 
+                                        className="p-1.5 text-surface-on-variant/50 hover:text-error dark:hover:text-error-dark transition-colors rounded-full" 
+                                        aria-label={`Remove ${item.name}`}
+                                    >
+                                        <TrashIcon className="w-4 h-4"/>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-3 items-end">
-                                <div className="flex-grow">
-                                    <OutlinedInput 
+
+                            {/* Controls - Right Side */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                
+                                {/* Minimal Input */}
+                                <div className="relative w-28">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-on-variant dark:text-surface-on-variant-dark text-sm pointer-events-none">₹</span>
+                                    <input 
                                         id={`${category.id}-${item.id}`}
                                         value={item.amount === 0 ? '' : item.amount}
-                                        onChange={(e: any) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
+                                        onChange={(e) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
                                         type="number"
                                         inputMode="decimal"
-                                        prefix
-                                        label="Amount"
-                                        data-expense-input="true"
-                                        parentBg="bg-surface-container dark:bg-surface-dark-container" // Keep standard for now
+                                        placeholder="0"
+                                        className="w-full h-10 pl-6 pr-3 bg-surface-container-highest/50 dark:bg-surface-dark-container-highest/50 focus:bg-surface-container-highest dark:focus:bg-surface-dark-container-highest rounded-xl text-right text-base font-semibold text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant/50 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                                     />
                                 </div>
-                                {CATEGORIES_WITH_BILL_UPLOAD.includes(category.name) && (
+
+                                {/* Camera Button */}
+                                {billUploadCategories.includes(category.name) && (
                                     <ImageUpload billPhotos={item.billPhotos} onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} />
                                 )}
                             </div>
@@ -452,8 +467,8 @@ const RecordForm: React.FC = () => {
                         )})}
                     </div>
                     
-                    {/* ACTION BUTTONS (fixed at bottom) */}
-                    <div className="flex gap-2 pt-4 border-t border-surface-outline/5 dark:border-surface-outline-dark/5 mt-4">
+                    {/* ACTION BUTTONS (fixed at bottom of category) */}
+                    <div className="flex gap-2 pt-6 mt-4">
                         <button 
                             type="button" 
                             onClick={() => { setNewItem({ name: '', categoryIndex: catIndex, saveForFuture: false, defaultValue: 0 }); setAddItemModalOpen(true); }} 
@@ -518,7 +533,7 @@ const RecordForm: React.FC = () => {
             <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
                 <h3 className="text-xl font-medium mb-6 text-surface-on dark:text-surface-on-dark">New Expense Item</h3>
                 <div className="space-y-4">
-                    <OutlinedInput id="newItemName" label="Item Name" value={newItem.name} onChange={(e: any) => setNewItem({...newItem, name: e.target.value})} parentBg="bg-surface-container dark:bg-surface-dark-container" />
+                    <OutlinedInput id="newItemName" label="Item Name" value={newItem.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewItem({...newItem, name: e.target.value})} parentBg="bg-surface-container dark:bg-surface-dark-container" />
                     
                     <label className="flex items-center space-x-3 p-2 cursor-pointer">
                         <input type="checkbox" checked={newItem.saveForFuture} onChange={(e) => setNewItem({...newItem, saveForFuture: e.target.checked})} className="w-5 h-5 text-primary dark:text-primary-dark border-surface-outline rounded focus:ring-primary dark:focus:ring-primary-dark bg-transparent"/>
@@ -526,7 +541,7 @@ const RecordForm: React.FC = () => {
                     </label>
 
                     {newItem.saveForFuture && (
-                       <OutlinedInput id="defaultValue" label="Default Amount" type="number" value={newItem.defaultValue === 0 ? '' : newItem.defaultValue} onChange={(e: any) => setNewItem({...newItem, defaultValue: parseFloat(e.target.value) || 0})} prefix parentBg="bg-surface-container dark:bg-surface-dark-container" />
+                       <OutlinedInput id="defaultValue" label="Default Amount" type="number" value={newItem.defaultValue === 0 ? '' : newItem.defaultValue} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewItem({...newItem, defaultValue: parseFloat(e.target.value) || 0})} prefix parentBg="bg-surface-container dark:bg-surface-dark-container" />
                     )}
                 </div>
                 <div className="mt-8 flex justify-end gap-2">
@@ -541,7 +556,7 @@ const RecordForm: React.FC = () => {
         <Modal onClose={() => setAddCategoryModalOpen(false)}>
             <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
                 <h3 className="text-xl font-medium mb-6 text-surface-on dark:text-surface-on-dark">New Category</h3>
-                <OutlinedInput id="newCategoryName" label="Category Name" value={newCategoryName} onChange={(e: any) => setNewCategoryName(e.target.value)} parentBg="bg-surface-container dark:bg-surface-dark-container" />
+                <OutlinedInput id="newCategoryName" label="Category Name" value={newCategoryName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCategoryName(e.target.value)} parentBg="bg-surface-container dark:bg-surface-dark-container" />
                 <div className="mt-8 flex justify-end gap-2">
                     <button type="button" onClick={() => setAddCategoryModalOpen(false)} className="px-4 py-2 text-primary dark:text-primary-dark font-medium hover:bg-primary-container/30 dark:hover:bg-primary-container-dark/30 rounded-full">Cancel</button>
                     <button type="button" onClick={handleAddNewCategory} className="px-6 py-2 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-medium">Add</button>

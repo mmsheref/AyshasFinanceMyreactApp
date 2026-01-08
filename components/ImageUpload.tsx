@@ -1,5 +1,6 @@
+
 import React, { useRef, useState } from 'react';
-import { CameraIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from './Icons';
+import { CameraIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, PhotoIcon } from './Icons';
 import Modal from './Modal';
 
 interface ImageUploadProps {
@@ -12,8 +13,11 @@ const MAX_DIMENSION = 1024; // Max width/height
 const JPEG_QUALITY = 0.7; // Compression quality
 
 const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChange }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  
   const [isManagerOpen, setIsManagerOpen] = useState(false);
+  const [isSourceSelectionOpen, setIsSourceSelectionOpen] = useState(false);
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,7 +26,8 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
 
     if (file.size > MAX_FILE_SIZE) {
       alert(`File is too large. Please select an image under ${MAX_FILE_SIZE / 1024 / 1024}MB.`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
       return;
     }
 
@@ -57,12 +62,24 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
       if (e.target?.result) img.src = e.target.result as string;
     };
     reader.readAsDataURL(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    
+    // Clear inputs so same file can be selected again
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+    
+    // Close source selection if open
+    setIsSourceSelectionOpen(false);
   };
 
-  const handleAddClick = () => {
-    fileInputRef.current?.click();
+  const openCamera = () => {
+    cameraInputRef.current?.click();
+    setIsSourceSelectionOpen(false);
   };
+
+  const openGallery = () => {
+    galleryInputRef.current?.click();
+    setIsSourceSelectionOpen(false);
+  }
   
   const handleRemovePhoto = (indexToRemove: number) => {
     onPhotosChange(billPhotos.filter((_, index) => index !== indexToRemove));
@@ -77,9 +94,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
   }
 
   const handlePrimaryClick = () => {
-    // If there are no photos, open file picker directly. Otherwise, open the manager.
+    // If there are no photos, immediately show source options. 
+    // Otherwise, open the manager where user can add more.
     if (billPhotos.length === 0) {
-      handleAddClick();
+      setIsSourceSelectionOpen(true);
     } else {
       setIsManagerOpen(true);
     }
@@ -89,25 +107,64 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
     <>
       <input
         type="file"
-        ref={fileInputRef}
+        ref={cameraInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={galleryInputRef}
         onChange={handleFileChange}
         accept="image/*"
         className="hidden"
       />
       
-      {/* Compact button in the form */}
+      {/* Compact Icon Button */}
       <button
         type="button"
         onClick={handlePrimaryClick}
-        className={`w-full text-sm font-medium p-2 rounded-lg flex items-center justify-center transition-colors ${
+        className={`relative flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 border ${
           billPhotos.length > 0
-            ? 'bg-secondary-container/50 dark:bg-secondary-container-dark/50 text-secondary-on-container dark:text-secondary-on-container-dark hover:bg-secondary-container dark:hover:bg-secondary-container-dark'
-            : 'bg-surface-container-high dark:bg-surface-dark-container-high text-surface-on-variant dark:text-surface-on-variant-dark hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest'
+            ? 'bg-primary dark:bg-primary-dark text-white dark:text-primary-on-dark border-transparent shadow-md'
+            : 'bg-surface-container-highest/50 dark:bg-surface-dark-container-highest/50 text-surface-on-variant dark:text-surface-on-variant-dark border-transparent hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest'
         }`}
+        aria-label="Add or view bill photos"
       >
-        <CameraIcon className="w-4 h-4 mr-2" />
-        {billPhotos.length > 0 ? `${billPhotos.length} photo(s) attached` : 'Add Bill Photo'}
+        <CameraIcon className="w-5 h-5" />
+        {billPhotos.length > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error dark:bg-error-dark text-[9px] font-bold text-white dark:text-error-on-dark shadow-sm ring-2 ring-surface dark:ring-surface-dark">
+                {billPhotos.length}
+            </span>
+        )}
       </button>
+
+      {/* Source Selection Modal (Tiny Bottom Sheet style) */}
+      {isSourceSelectionOpen && (
+        <Modal onClose={() => setIsSourceSelectionOpen(false)} size="alert">
+            <div className="p-4 bg-surface-container dark:bg-surface-dark-container rounded-xl">
+                <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark mb-4 text-center">Add Bill Photo</h3>
+                <div className="flex gap-3">
+                    <button onClick={openCamera} className="flex-1 flex flex-col items-center justify-center p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl hover:bg-primary/10 active:bg-primary/20 transition-colors">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 dark:bg-primary-dark/20 text-primary dark:text-primary-dark flex items-center justify-center mb-2">
+                            <CameraIcon className="w-6 h-6" />
+                        </div>
+                        <span className="text-sm font-medium text-surface-on dark:text-surface-on-dark">Camera</span>
+                    </button>
+                    <button onClick={openGallery} className="flex-1 flex flex-col items-center justify-center p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl hover:bg-secondary/10 active:bg-secondary/20 transition-colors">
+                        <div className="w-10 h-10 rounded-full bg-secondary/10 dark:bg-secondary-dark/20 text-secondary dark:text-secondary-dark flex items-center justify-center mb-2">
+                            <PhotoIcon className="w-6 h-6" />
+                        </div>
+                        <span className="text-sm font-medium text-surface-on dark:text-surface-on-dark">Gallery</span>
+                    </button>
+                </div>
+                <button onClick={() => setIsSourceSelectionOpen(false)} className="w-full mt-4 py-2.5 text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest rounded-full transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </Modal>
+      )}
 
       {/* Photo Manager Modal */}
       {isManagerOpen && (
@@ -125,7 +182,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
                   />
                   <button 
                       onClick={() => handleRemovePhoto(index)} 
-                      className="absolute -top-1.5 -right-1.5 bg-error text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1.5 -right-1.5 bg-error text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                       aria-label={`Remove image ${index + 1}`}
                   >
                     <TrashIcon className="w-3.5 h-3.5" />
@@ -134,7 +191,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ billPhotos = [], onPhotosChan
               ))}
               <button
                 type="button"
-                onClick={handleAddClick}
+                onClick={() => setIsSourceSelectionOpen(true)}
                 className="w-full h-full aspect-square rounded-md border-2 border-dashed border-surface-outline/30 dark:border-surface-outline-dark/30 text-surface-outline dark:text-surface-outline-dark hover:border-primary dark:hover:border-primary-dark hover:text-primary dark:hover:text-primary-dark transition-colors flex flex-col items-center justify-center"
                 aria-label="Add a bill photo"
               >

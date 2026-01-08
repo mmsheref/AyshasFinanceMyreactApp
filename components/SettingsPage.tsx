@@ -192,7 +192,15 @@ const ReportCardManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
 };
 
 const SettingsPage: React.FC = () => {
-    const { records, customStructure, activeYear, handleRestore, handleUpdateStructure } = useAppContext();
+    const { 
+        records, 
+        customStructure, 
+        activeYear, 
+        billUploadCategories, 
+        handleRestore, 
+        handleUpdateStructure, 
+        handleUpdateBillUploadCategories 
+    } = useAppContext();
     const navigate = useNavigate();
     const [isStructureModalOpen, setStructureModalOpen] = useState(false);
     const [isFoodCostModalOpen, setFoodCostModalOpen] = useState(false);
@@ -200,9 +208,10 @@ const SettingsPage: React.FC = () => {
     const [isAboutModalOpen, setAboutModalOpen] = useState(false);
     const [isYearModalOpen, setYearModalOpen] = useState(false);
 
-    const onStructureUpdate = async (newStructure: CustomExpenseStructure) => {
+    const handleStructureSave = async (newStructure: CustomExpenseStructure, newBillFlags: string[]) => {
         await handleUpdateStructure(newStructure);
-        alert("Expense structure updated successfully!");
+        await handleUpdateBillUploadCategories(newBillFlags);
+        alert("Settings saved successfully!");
     };
 
     return (
@@ -247,7 +256,11 @@ const SettingsPage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex-grow p-4 overflow-y-auto">
-                           <ExpenseStructureManager structure={customStructure} onUpdate={onStructureUpdate} />
+                           <ExpenseStructureManager 
+                                structure={customStructure} 
+                                onSave={handleStructureSave} 
+                                initialBillUploadCategories={billUploadCategories}
+                           />
                         </div>
                     </div>
                 </Modal>
