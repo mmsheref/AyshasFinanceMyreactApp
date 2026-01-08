@@ -1,10 +1,11 @@
+
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateTotalExpenses, getTodayDateString, getThisWeekRange, getLastWeekRange, getThisMonthRange, getLastMonthRange } from '../utils/record-utils';
+import { calculateTotalExpenses, getTodayDateString, getThisWeekRange, getLastWeekRange, getThisMonthRange, getLastMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
 import DateRangePicker from './DateRangePicker';
 import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
-import { DownloadIcon, InformationCircleIcon, XMarkIcon } from './Icons';
+import { DownloadIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
 import { saveCsvFile } from '../utils/capacitor-utils';
 import { convertToCSV } from '../utils/csv-utils';
 import Modal from './Modal';
@@ -82,7 +83,7 @@ const ExpenseDonutChart: React.FC<{ data: { name: string, value: number, color: 
                 <div className="absolute inset-4 bg-surface-container-low dark:bg-surface-dark-container-low rounded-full flex items-center justify-center">
                     <div className="text-center">
                         <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark font-medium uppercase">Total</p>
-                        <p className="font-bold text-base text-surface-on dark:text-surface-on-dark">₹{(total/1000).toFixed(1)}k</p>
+                        <p className="font-bold text-base text-surface-on dark:text-surface-on-dark">₹{formatIndianNumberCompact(total)}</p>
                     </div>
                 </div>
             </div>
@@ -109,8 +110,10 @@ const Reports: React.FC = () => {
     const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
     const [isPickerOpen, setPickerOpen] = useState(false);
     const [modalInfo, setModalInfo] = useState<ModalInfo | null>(null);
+    const [showAllExpenses, setShowAllExpenses] = useState(false);
 
-    const finishedRecords = useMemo(() => sortedRecords.filter(r => r.totalSales > 0), [sortedRecords]);
+    // Filter out closed days for reports, but include days with > 0 sales OR expenses (loss days)
+    const finishedRecords = useMemo(() => sortedRecords.filter(r => !r.isClosed && (r.totalSales > 0 || calculateTotalExpenses(r) > 0)), [sortedRecords]);
 
     const filteredRecords = useMemo(() => {
         let startStr = '';
@@ -198,9 +201,9 @@ const Reports: React.FC = () => {
             .sort(([, a], [, b]) => b - a)
             .map(([name, value], i) => ({ name, value, color: CHART_COLORS[i % CHART_COLORS.length] }));
 
-        const topItems = Object.entries(itemExpenses)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 5);
+        // Sorted list of ALL items high to low
+        const sortedExpenseItems = Object.entries(itemExpenses)
+            .sort(([, a], [, b]) => b - a);
             
         const primeCost = totalLaborCost + totalFoodCost;
 
@@ -220,7 +223,7 @@ const Reports: React.FC = () => {
             mostProfitableDay: mostProfit,
             leastProfitableDay: leastProfit.amount === Infinity ? { date: '', amount: 0 } : leastProfit,
             topCategories,
-            topItems,
+            sortedExpenseItems,
         };
     }, [filteredRecords, foodCostCategories]);
     
@@ -403,6 +406,8 @@ const Reports: React.FC = () => {
 
     const filterOptions: FilterPreset[] = ['THIS_MONTH', 'LAST_MONTH', 'THIS_WEEK', 'ALL_TIME'];
 
+    const displayedExpenses = showAllExpenses ? reportData.sortedExpenseItems : reportData.sortedExpenseItems.slice(0, 5);
+
     return (
         <div className="space-y-4 pb-6">
              {/* Header */}
@@ -434,15 +439,15 @@ const Reports: React.FC = () => {
                 {reportCardVisibility.PROFIT_MARGIN && <ReportCard label="Profit Margin" value={`${reportData.profitMargin.toFixed(1)}%`} onClick={() => openMetricModal('PROFIT_MARGIN')} />}
                 {reportCardVisibility.PRIME_COST && <ReportCard label="Prime Cost" value={`${reportData.primeCostPercentage.toFixed(1)}%`} onClick={() => openMetricModal('PRIME_COST')} />}
                 
-                {reportCardVisibility.TOTAL_SALES && <ReportCard label="Sales" value={`₹${(reportData.totalSales/1000).toFixed(1)}k`} onClick={() => openMetricModal('TOTAL_SALES')} />}
-                {reportCardVisibility.TOTAL_EXPENSES && <ReportCard label="Expenses" value={`₹${(reportData.totalExpenses/1000).toFixed(1)}k`} onClick={() => openMetricModal('TOTAL_EXPENSES')} />}
+                {reportCardVisibility.TOTAL_SALES && <ReportCard label="Sales" value={`₹${formatIndianNumberCompact(reportData.totalSales)}`} onClick={() => openMetricModal('TOTAL_SALES')} />}
+                {reportCardVisibility.TOTAL_EXPENSES && <ReportCard label="Expenses" value={`₹${formatIndianNumberCompact(reportData.totalExpenses)}`} onClick={() => openMetricModal('TOTAL_EXPENSES')} />}
             </div>
             
             {/* Secondary Metrics Scroll or Grid */}
             <div className="grid grid-cols-3 gap-2">
                  {reportCardVisibility.FOOD_COST && <ReportCard label="Food %" value={`${reportData.foodCostPercentage.toFixed(0)}%`} onClick={() => openMetricModal('FOOD_COST')} />}
                  {reportCardVisibility.LABOR_COST && <ReportCard label="Labor %" value={`${reportData.laborCostPercentage.toFixed(0)}%`} onClick={() => openMetricModal('LABOR_COST')}/>}
-                 {reportCardVisibility.AVG_DAILY_PROFIT && <ReportCard label="Avg Profit" value={`₹${(reportData.avgDailyProfit/1000).toFixed(1)}k`} />}
+                 {reportCardVisibility.AVG_DAILY_PROFIT && <ReportCard label="Avg Profit" value={`₹${formatIndianNumberCompact(reportData.avgDailyProfit)}`} />}
             </div>
 
             {/* Charts Area */}
@@ -462,18 +467,34 @@ const Reports: React.FC = () => {
                     <h3 className="text-sm font-medium mb-4 text-surface-on dark:text-surface-on-dark">Expense Categories</h3>
                     <ExpenseDonutChart data={reportData.topCategories} total={reportData.totalExpenses} />
                 </div>
-                 <div className="bg-surface-container-low dark:bg-surface-dark-container-low p-5 rounded-[20px]">
-                    <h3 className="text-sm font-medium mb-4 text-surface-on dark:text-surface-on-dark">Top Expenses</h3>
-                    {reportData.topItems.length > 0 ? (
-                        <div className="space-y-4">
-                        {reportData.topItems.map(([name, value], i) => (
+                 <div className={`bg-surface-container-low dark:bg-surface-dark-container-low p-5 rounded-[20px] transition-all duration-300 ${showAllExpenses ? 'row-span-2' : ''}`}>
+                    <div 
+                        className="flex justify-between items-center mb-4 cursor-pointer group select-none"
+                        onClick={() => setShowAllExpenses(!showAllExpenses)}
+                    >
+                        <h3 className="text-sm font-medium text-surface-on dark:text-surface-on-dark group-hover:text-primary dark:group-hover:text-primary-dark transition-colors">
+                            {showAllExpenses ? 'All Expenses' : 'Top Expenses'}
+                        </h3>
+                        {reportData.sortedExpenseItems.length > 5 && (
+                            <button className="flex items-center text-xs font-medium text-primary dark:text-primary-dark bg-primary/10 dark:bg-primary-dark/10 px-2 py-1 rounded-full transition-colors group-hover:bg-primary/20 dark:group-hover:bg-primary-dark/20">
+                                {showAllExpenses ? (
+                                    <>Collapse <ChevronUpIcon className="w-3 h-3 ml-1" /></>
+                                ) : (
+                                    <>View All <ChevronDownIcon className="w-3 h-3 ml-1" /></>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                    {reportData.sortedExpenseItems.length > 0 ? (
+                        <div className={`space-y-4 ${showAllExpenses ? 'max-h-[60vh] overflow-y-auto pr-1' : ''}`}>
+                        {displayedExpenses.map(([name, value], i) => (
                             <div key={name} className="relative">
                                 <div className="flex justify-between text-xs mb-1.5 relative z-10">
                                     <span className="font-medium text-surface-on dark:text-surface-on-dark">{name}</span>
                                     <span className="font-semibold text-surface-on dark:text-surface-on-dark">₹{value.toLocaleString('en-IN')}</span>
                                 </div>
                                 <div className="w-full bg-surface-container-high dark:bg-surface-dark-container-high rounded-full h-2 overflow-hidden">
-                                    <div className="bg-primary dark:bg-primary-dark h-full rounded-full" style={{ width: `${(value / reportData.topItems[0][1]) * 100}%` }}></div>
+                                    <div className="bg-primary dark:bg-primary-dark h-full rounded-full" style={{ width: `${(value / reportData.sortedExpenseItems[0][1]) * 100}%` }}></div>
                                 </div>
                             </div>
                         ))}

@@ -1,3 +1,4 @@
+
 import { DailyRecord } from '../types';
 
 /**
@@ -42,24 +43,34 @@ export const subtractDays = (refDateStr: string, days: number): string => {
 };
 
 /**
- * Gets the start and end date strings for "This Week" (Starts Sunday).
+ * Gets the start and end date strings for "This Week" (Starts Monday).
  */
 export const getThisWeekRange = (): { start: string, end: string } => {
     const todayStr = getTodayDateString();
     const today = new Date(todayStr + 'T00:00:00');
     const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
     
-    const startStr = subtractDays(todayStr, dayOfWeek);
+    // Convert to Monday start:
+    // JS getDay(): Sun=0, Mon=1, Tue=2, ... Sat=6
+    // We want days to subtract:
+    // If Mon(1) -> subtract 0
+    // If Tue(2) -> subtract 1
+    // ...
+    // If Sun(0) -> subtract 6
+    
+    const daysFromMonday = (dayOfWeek + 6) % 7;
+    
+    const startStr = subtractDays(todayStr, daysFromMonday);
     return { start: startStr, end: todayStr };
 };
 
 /**
- * Gets the start and end date strings for "Last Week" (Sun-Sat).
+ * Gets the start and end date strings for "Last Week" (Mon-Sun).
  */
 export const getLastWeekRange = (): { start: string, end: string } => {
     const thisWeekStart = getThisWeekRange().start;
-    const endStr = subtractDays(thisWeekStart, 1); // Last Saturday
-    const startStr = subtractDays(endStr, 6); // Last Sunday
+    const endStr = subtractDays(thisWeekStart, 1); // Last Sunday
+    const startStr = subtractDays(endStr, 6); // Last Monday
     return { start: startStr, end: endStr };
 };
 
@@ -97,4 +108,20 @@ export const getLastMonthRange = (): { start: string, end: string } => {
     };
 
     return { start: formatDate(lastMonthStart), end: formatDate(lastMonthEnd) };
+};
+
+/**
+ * Formats a number into Indian Compact numbering system (Lakh/Crore)
+ * @param amount - The number to format
+ * @returns Formatted string (e.g., "1.5 Lakh", "4.2 Cr", "50,000")
+ */
+export const formatIndianNumberCompact = (amount: number): string => {
+    const absVal = Math.abs(amount);
+    if (absVal >= 10000000) {
+        return `${(amount / 10000000).toFixed(2)} Cr`;
+    }
+    if (absVal >= 100000) {
+        return `${(amount / 100000).toFixed(2)} Lakh`;
+    }
+    return amount.toLocaleString('en-IN');
 };

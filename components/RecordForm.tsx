@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
@@ -37,6 +38,19 @@ const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = 
     </div>
 )};
 
+const Switch: React.FC<{ checked: boolean, onChange: (checked: boolean) => void, label?: string }> = ({ checked, onChange, label }) => {
+    return (
+        <label className="flex items-center cursor-pointer">
+            <div className="relative">
+                <input type="checkbox" className="sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+                <div className={`block w-12 h-7 rounded-full transition-colors ${checked ? 'bg-primary dark:bg-primary-dark' : 'bg-surface-variant dark:bg-surface-dark-container-high'}`}></div>
+                <div className={`dot absolute left-1 top-1 bg-white w-5 h-5 rounded-full transition-transform ${checked ? 'transform translate-x-5' : ''}`}></div>
+            </div>
+            {label && <span className="ml-3 text-sm font-medium text-surface-on dark:text-surface-on-dark">{label}</span>}
+        </label>
+    );
+};
+
 const RecordForm: React.FC = () => {
   const { recordId } = useParams<{ recordId: string }>();
   const navigate = useNavigate();
@@ -74,12 +88,11 @@ const RecordForm: React.FC = () => {
         }
       } else {
         // Generate new expenses based on the custom structure defaults.
-        // The old logic that copied from the previous day has been removed as requested.
         const newExpenses = generateNewRecordExpenses(customStructure);
         
         const today = new Date().toISOString().split('T')[0];
         setFormData({
-          id: today, date: today, totalSales: 0, morningSales: 0, expenses: newExpenses
+          id: today, date: today, totalSales: 0, morningSales: 0, expenses: newExpenses, isClosed: false
         });
         setOpenCategory(localStorage.getItem('ayshas-last-open-category') || newExpenses[0]?.name || null);
       }
@@ -106,8 +119,9 @@ const RecordForm: React.FC = () => {
   
   const profit = useMemo(() => {
     if (!formData) return 0;
+    if (formData.isClosed) return -totalExpenses; // If closed, profit is just negative expenses
     return (formData.totalSales || 0) - totalExpenses;
-  }, [formData?.totalSales, totalExpenses]);
+  }, [formData?.totalSales, totalExpenses, formData?.isClosed]);
 
   const nightSales = useMemo(() => {
     if (!formData) return 0;
@@ -148,7 +162,6 @@ const RecordForm: React.FC = () => {
         updatedFormData.date = value;
         updatedFormData.id = value;
     } else {
-        // Allow empty string to clear the input, otherwise parse
         if (value === '') {
             (updatedFormData as any)[name] = 0;
         } else {
@@ -159,9 +172,22 @@ const RecordForm: React.FC = () => {
     setFormData(updatedFormData);
   };
 
+  const handleClosedToggle = (checked: boolean) => {
+    setFormData(prev => {
+        if (!prev) return null;
+        return {
+            ...prev,
+            isClosed: checked,
+            // Optional: Clear sales if marked as closed? Or just visually hide them.
+            // Let's set them to 0 to ensure consistency.
+            totalSales: checked ? 0 : prev.totalSales,
+            morningSales: checked ? 0 : prev.morningSales
+        };
+    });
+  };
+
   const handleExpenseChange = (catIndex: number, itemIndex: number, valueStr: string) => {
     const newExpenses = [...expenses];
-    // Allow typing decimals by not aggressively parsing if it ends in a dot
     let val = parseFloat(valueStr);
     if (isNaN(val)) val = 0;
     
@@ -306,29 +332,42 @@ const RecordForm: React.FC = () => {
     <form onSubmit={handleSubmit} className="space-y-6 pb-44">
       {/* Primary Info Section */}
       <div className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[24px] shadow-sm space-y-6">
-        <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark">Daily Sales</h3>
+        <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark">Daily Sales</h3>
+            <Switch checked={!!formData.isClosed} onChange={handleClosedToggle} label="Mark as Closed / Off" />
+        </div>
         
         <div>
             <label htmlFor="date" className="block text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1 ml-1">Date</label>
             <input type="date" id="date" name="date" value={formData.date} onChange={handleInputChange} className="w-full px-4 py-3 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl border-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark text-surface-on dark:text-surface-on-dark" />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-            <OutlinedInput label="Morning Sales" id="morningSales" value={morningSales === 0 ? '' : morningSales} onChange={handleInputChange} type="number" inputMode="decimal" prefix />
-            <OutlinedInput label="Total Sales" id="totalSales" value={totalSales === 0 ? '' : totalSales} onChange={handleInputChange} type="number" inputMode="decimal" prefix />
-        </div>
-
-         <div className="flex justify-between items-center p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
-             <span className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm font-medium">Night Sales (Calc)</span>
-             <span className="text-lg font-bold text-surface-on dark:text-surface-on-dark">₹{nightSales.toLocaleString('en-IN')}</span>
-         </div>
-
-        {nightSales < 0 && (
-            <div className="flex items-start p-3 text-sm bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark rounded-xl">
-                <WarningIcon className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
-                <span>Morning Sales cannot exceed Total Sales.</span>
+        {formData.isClosed ? (
+             <div className="p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl text-center border border-dashed border-surface-outline/30 dark:border-surface-outline-dark/30">
+                <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm font-medium">Shop Marked as Closed</p>
+                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1 opacity-70">Sales are set to 0. You can still add fixed expenses below.</p>
             </div>
+        ) : (
+            <>
+                <div className="grid grid-cols-2 gap-4">
+                    <OutlinedInput label="Morning Sales" id="morningSales" value={morningSales === 0 ? '' : morningSales} onChange={handleInputChange} type="number" inputMode="decimal" prefix />
+                    <OutlinedInput label="Total Sales" id="totalSales" value={totalSales === 0 ? '' : totalSales} onChange={handleInputChange} type="number" inputMode="decimal" prefix />
+                </div>
+
+                <div className="flex justify-between items-center p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
+                    <span className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm font-medium">Night Sales (Calc)</span>
+                    <span className="text-lg font-bold text-surface-on dark:text-surface-on-dark">₹{nightSales.toLocaleString('en-IN')}</span>
+                </div>
+
+                {nightSales < 0 && (
+                    <div className="flex items-start p-3 text-sm bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark rounded-xl">
+                        <WarningIcon className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+                        <span>Morning Sales cannot exceed Total Sales.</span>
+                    </div>
+                )}
+            </>
         )}
+        
         {dateError && (
              <div className="flex items-start p-3 text-sm bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark rounded-xl">
                 <WarningIcon className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />

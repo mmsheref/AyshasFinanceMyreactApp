@@ -1,3 +1,4 @@
+
 import { DailyRecord, CustomExpenseStructure, ExpenseCategory } from '../types';
 import { DEFAULT_EXPENSE_STRUCTURE } from '../constants';
 
@@ -44,6 +45,12 @@ export const runMigration = (recordsToMigrate: DailyRecord[]): { migratedRecords
         // Migration 1: Add morningSales if it doesn't exist
         if (typeof rec.morningSales === 'undefined') {
             rec.morningSales = 0;
+            needsUpdate = true;
+        }
+
+        // Migration 3: Add isClosed if it doesn't exist
+        if (typeof rec.isClosed === 'undefined') {
+            rec.isClosed = false;
             needsUpdate = true;
         }
 

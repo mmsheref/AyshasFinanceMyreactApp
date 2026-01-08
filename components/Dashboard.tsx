@@ -4,120 +4,147 @@ import { useNavigate } from 'react-router-dom';
 import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
 import { useAppContext } from '../context/AppContext';
-import { calculateTotalExpenses, getTodayDateString, subtractDays } from '../utils/record-utils';
-import DateRangePicker from './DateRangePicker';
-import { SparklesIcon, ChevronRightIcon } from './Icons';
+import { calculateTotalExpenses, getTodayDateString, subtractDays, getThisWeekRange, getThisMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
+import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon } from './Icons';
 
-type FilterValue = '7D' | '30D' | '90D' | 'ALL' | 'CUSTOM';
+type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
+
+const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean, onClick: (val: ChartFilter) => void }> = ({ label, value, active, onClick }) => (
+    <button 
+      onClick={() => onClick(value)}
+      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${active ? 'bg-primary dark:bg-primary-dark text-white dark:text-primary-on-dark' : 'bg-surface-container-highest dark:bg-surface-dark-container-highest text-surface-on-variant dark:text-surface-on-variant-dark hover:bg-surface-outline/20'}`}
+    >
+        {label}
+    </button>
+);
 
 const Dashboard: React.FC = () => {
   const { sortedRecords: records, activeYear } = useAppContext();
   const navigate = useNavigate();
-  
-  const [activeFilter, setActiveFilter] = useState<FilterValue>('ALL');
-  const [isDateRangePickerOpen, setIsDateRangePickerOpen] = useState(false);
-  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
+  const [chartFilter, setChartFilter] = useState<ChartFilter>('WEEK');
 
-  // Filter records that actually have sales
-  const finishedRecords = useMemo(() => {
-    return records.filter(record => record.totalSales > 0);
-  }, [records]);
+  // 1. Get Dates
+  const todayStr = getTodayDateString();
+  const yesterdayStr = subtractDays(todayStr, 1);
 
-  // Calculations for KPI Cards
-  const {
-    avg7DayProfit,
-    avg30DayProfit,
-    totalProfitPeriod
-  } = useMemo(() => {
-    const todayStr = getTodayDateString();
-    const sevenDaysAgoStr = subtractDays(todayStr, 6); 
-    const thirtyDaysAgoStr = subtractDays(todayStr, 29);
+  // 2. Find Specific Records
+  const yesterdayRecord = useMemo(() => 
+    records.find(r => r.date === yesterdayStr), 
+  [records, yesterdayStr]);
 
-    let total7Day = 0;
-    let count7Day = 0;
-    let total30Day = 0;
-    let count30Day = 0;
-    let totalPeriod = 0;
+  // 3. Calculate "This Week's" Stats (Monday -> Today)
+  const thisWeekStats = useMemo(() => {
+    const { start: startOfWeek } = getThisWeekRange();
+    
+    let totalSales = 0;
+    let totalExpenses = 0;
+    let recordCount = 0;
+    let openDaysCount = 0;
+    let earliestDate = todayStr;
+    let latestDate = startOfWeek;
 
-    finishedRecords.forEach(r => {
-        const expenses = calculateTotalExpenses(r);
-        const profit = r.totalSales - expenses;
-        
-        totalPeriod += profit;
+    records.forEach(r => {
+        if (r.date >= startOfWeek && r.date <= todayStr) {
+            totalSales += r.totalSales;
+            totalExpenses += calculateTotalExpenses(r);
+            recordCount++;
+            
+            if (!r.isClosed) {
+                openDaysCount++;
+            }
 
-        if (r.date >= sevenDaysAgoStr && r.date <= todayStr) {
-            total7Day += profit;
-            count7Day++;
-        }
-
-        if (r.date >= thirtyDaysAgoStr && r.date <= todayStr) {
-            total30Day += profit;
-            count30Day++;
+            if (r.date < earliestDate) earliestDate = r.date;
+            if (r.date > latestDate) latestDate = r.date;
         }
     });
+
+    const profit = totalSales - totalExpenses;
+    
+    // Avoid division by zero
+    const avgSales = openDaysCount > 0 ? totalSales / openDaysCount : 0;
+    const avgExpenses = openDaysCount > 0 ? totalExpenses / openDaysCount : 0;
+    const avgProfit = openDaysCount > 0 ? profit / openDaysCount : 0;
+    
+    // Format range text
+    const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const rangeText = recordCount > 0 
+        ? `${formatDate(earliestDate)} - ${formatDate(latestDate)}` 
+        : 'No records';
 
     return {
-      avg7DayProfit: count7Day > 0 ? total7Day / count7Day : 0,
-      avg30DayProfit: count30Day > 0 ? total30Day / count30Day : 0,
-      totalProfitPeriod: totalPeriod,
+        profit,
+        sales: totalSales,
+        expenses: totalExpenses,
+        avgProfit,
+        avgSales,
+        avgExpenses,
+        count: recordCount,
+        openDaysCount,
+        startDate: startOfWeek,
+        rangeText
     };
-  }, [finishedRecords]);
-  
-  // Filter for Charts
-  const filteredRecordsForCharts = useMemo(() => {
-      const ascendingRecords = [...finishedRecords].sort((a, b) => a.date.localeCompare(b.date)); 
-      
-      if (activeFilter === 'ALL') return ascendingRecords;
-      
-      if (activeFilter === 'CUSTOM') {
-          const { startDate, endDate } = dateRange;
-          if (!startDate && !endDate) return ascendingRecords;
-          return ascendingRecords.filter(record => {
-              const afterStartDate = !startDate || record.date >= startDate;
-              const beforeEndDate = !endDate || record.date <= endDate;
-              return afterStartDate && beforeEndDate;
-          });
-      }
+  }, [records, todayStr]);
 
-      const todayStr = getTodayDateString();
-      let startStr = '';
+  // 4. Prepare Yesterday's Data
+  const yesterdayStats = useMemo(() => {
+    if (!yesterdayRecord) return null;
+    const expenses = calculateTotalExpenses(yesterdayRecord);
+    return {
+        sales: yesterdayRecord.totalSales,
+        expenses: expenses,
+        profit: yesterdayRecord.totalSales - expenses,
+        hasRecord: true,
+        isClosed: yesterdayRecord.isClosed
+    };
+  }, [yesterdayRecord]);
 
-      if (activeFilter === '7D') startStr = subtractDays(todayStr, 6);
-      if (activeFilter === '30D') startStr = subtractDays(todayStr, 29);
-      if (activeFilter === '90D') startStr = subtractDays(todayStr, 89);
-      
-      return ascendingRecords.filter(record => record.date >= startStr);
-  }, [finishedRecords, activeFilter, dateRange]);
-
-  // Chart Data Preparation
+  // 5. Chart Data (Dynamic based on filter)
   const chartData = useMemo(() => {
-    return filteredRecordsForCharts.map(r => {
+    let filteredRecords = records;
+    
+    if (chartFilter === 'WEEK') {
+        const { start } = getThisWeekRange();
+        filteredRecords = records.filter(r => r.date >= start);
+    } else if (chartFilter === 'MONTH') {
+        const { start } = getThisMonthRange();
+        filteredRecords = records.filter(r => r.date >= start);
+    } 
+    // 'YEAR' uses all records (already filtered by activeYear in context)
+
+    // Sort oldest to newest for the graph
+    return [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date)).map(r => {
         const totalExpenses = calculateTotalExpenses(r);
-        const totalSales = r.totalSales || 0;
         return {
             date: r.date,
-            sales: totalSales,
+            sales: r.totalSales,
             expenses: totalExpenses,
-            profit: totalSales - totalExpenses,
+            profit: r.isClosed ? -totalExpenses : r.totalSales - totalExpenses,
         };
     });
-  }, [filteredRecordsForCharts]);
+  }, [records, chartFilter]);
 
   const salesChartData = useMemo(() => {
-    return filteredRecordsForCharts.map(r => {
-        const morningSales = r.morningSales || 0;
-        const totalSales = r.totalSales || 0;
-        const nightSales = totalSales - morningSales;
+    let filteredRecords = records;
+    if (chartFilter === 'WEEK') {
+        const { start } = getThisWeekRange();
+        filteredRecords = records.filter(r => r.date >= start);
+    } else if (chartFilter === 'MONTH') {
+        const { start } = getThisMonthRange();
+        filteredRecords = records.filter(r => r.date >= start);
+    }
+
+    return [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date)).map(r => {
         return {
             date: r.date,
-            morningSales,
-            nightSales,
-            totalSales,
+            morningSales: r.morningSales || 0,
+            nightSales: (r.totalSales || 0) - (r.morningSales || 0),
+            totalSales: r.totalSales || 0,
         };
     });
-  }, [filteredRecordsForCharts]);
+  }, [records, chartFilter]);
 
 
+  // --- EMPTY STATE ---
   if (records.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-6">
@@ -126,106 +153,163 @@ const Dashboard: React.FC = () => {
         </div>
         <h2 className="text-xl font-medium text-surface-on dark:text-surface-on-dark">Welcome, Aysha!</h2>
         <p className="text-surface-on-variant dark:text-surface-on-variant-dark mt-2 text-sm max-w-xs leading-relaxed">
-          {activeYear === 'all' 
-            ? "Start tracking your restaurant's performance. Tap the + button to add your first record."
-            : `No records found for the fiscal year ${activeYear}. Select another year in settings or add a new record.`}
+           Ready to calculate your profit? Add your first record to get started.
         </p>
+        <button 
+            onClick={() => navigate('/records/new')}
+            className="mt-6 flex items-center px-6 py-3 bg-primary dark:bg-primary-dark text-white rounded-full font-bold shadow-lg"
+        >
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Today's Record
+        </button>
       </div>
     );
   }
-  
-  const handleQuickFilterClick = (value: FilterValue) => {
-    setActiveFilter(value);
-    if (value === 'CUSTOM') {
-        setIsDateRangePickerOpen(true);
-    } else {
-        setDateRange({ startDate: '', endDate: '' });
-    }
-  };
-  
-  const handleApplyDateRange = (newRange: { startDate: string; endDate: string }) => {
-    setDateRange(newRange);
-    setActiveFilter('CUSTOM');
-  };
-
-  const SummaryCard: React.FC<{ value: number, label: string, subLabel?: string, highlight?: boolean }> = ({ value, label, subLabel, highlight }) => {
-      const isPositive = value >= 0;
-      return (
-        <div className={`p-4 rounded-[20px] flex flex-col justify-between shadow-none transition-colors ${highlight ? 'bg-primary-container dark:bg-primary-container-dark' : 'bg-surface-container dark:bg-surface-dark-container'}`}>
-            <div>
-                <h3 className={`text-sm font-medium ${highlight ? 'text-primary-on-container dark:text-primary-on-container-dark' : 'text-surface-on-variant dark:text-surface-on-variant-dark'}`}>{label}</h3>
-                <p className={`text-2xl font-bold mt-1 tracking-tight ${
-                    highlight 
-                        ? 'text-primary-on-container dark:text-primary-on-container-dark' 
-                        : (isPositive ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark')
-                }`}>
-                     ₹{Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </p>
-            </div>
-            {subLabel && <p className={`text-xs mt-2 ${highlight ? 'text-primary-on-container/70 dark:text-primary-on-container-dark/70' : 'text-surface-on-variant dark:text-surface-on-variant-dark opacity-80'}`}>{subLabel}</p>}
-        </div>
-      );
-  };
-  
-  const FilterChip: React.FC<{ label: string, value: FilterValue, active: boolean, onClick: () => void }> = ({ label, value, active, onClick }) => (
-      <button
-          onClick={onClick}
-          className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors border ${
-              active
-                  ? 'bg-secondary-container dark:bg-secondary-container-dark text-secondary-on-container dark:text-secondary-on-container-dark border-transparent'
-                  : 'bg-transparent text-surface-on-variant dark:text-surface-on-variant-dark border-surface-outline/30 dark:border-surface-outline-dark/30'
-          }`}
-      >
-          {label}
-      </button>
-  );
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-6 pb-6 pt-2">
         {/* Header */}
-        <div>
-            <h1 className="text-3xl font-normal text-surface-on dark:text-surface-on-dark">Dashboard</h1>
-            <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">{activeYear === 'all' ? 'Business Overview' : `Fiscal Year ${activeYear}`}</p>
+        <div className="flex justify-between items-end">
+            <div>
+                <h1 className="text-3xl font-normal text-surface-on dark:text-surface-on-dark">Overview</h1>
+                <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">
+                    {activeYear === 'all' ? 'Business Dashboard' : `Fiscal Year ${activeYear}`}
+                </p>
+            </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
-             <div className="col-span-2">
-                <SummaryCard 
-                    value={totalProfitPeriod} 
-                    label={activeYear === 'all' ? "Total Net Profit" : `Profit for ${activeYear}`} 
-                    subLabel={activeYear === 'all' ? `All-time across ${finishedRecords.length} records` : `Across ${finishedRecords.length} records in ${activeYear}`}
-                    highlight
-                />
+        {/* SECTION 1: THE PULSE (YESTERDAY) */}
+        {yesterdayStats ? (
+            <div className="bg-surface-container-high dark:bg-surface-dark-container-high rounded-[24px] p-5 shadow-sm border border-surface-outline/10 dark:border-surface-outline-dark/10">
+                <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-primary/10 dark:bg-primary-dark/10 p-1.5 rounded-lg">
+                            <CalendarIcon className="w-5 h-5 text-primary dark:text-primary-dark"/>
+                        </div>
+                        <h2 className="text-base font-bold text-surface-on dark:text-surface-on-dark">Yesterday</h2>
+                    </div>
+                    <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-highest dark:bg-surface-dark-container-highest px-2 py-1 rounded-md">
+                        {new Date(yesterdayStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </span>
+                </div>
+                
+                {yesterdayStats.isClosed ? (
+                    <div className="py-4 text-center">
+                        <span className="inline-block px-3 py-1 bg-surface-container-highest dark:bg-surface-dark-container-highest text-surface-on-variant dark:text-surface-on-variant-dark text-sm font-bold uppercase tracking-wider rounded-lg border border-surface-outline/20">Shop Closed</span>
+                        <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-2">Fixed Expenses: ₹{yesterdayStats.expenses.toLocaleString('en-IN')}</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Big Profit Number */}
+                        <div className="mt-2 mb-4">
+                            <span className={`text-4xl font-bold tracking-tight ${yesterdayStats.profit >= 0 ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
+                                {yesterdayStats.profit >= 0 ? '+' : '-'}₹{Math.abs(yesterdayStats.profit).toLocaleString('en-IN')}
+                            </span>
+                            <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">
+                                {yesterdayStats.profit < 0 ? "Loss likely due to expenses/refills." : "Net profit after expenses."}
+                            </p>
+                        </div>
+
+                        {/* Mini Breakdown */}
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                            <div>
+                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Sales</p>
+                                <p className="font-semibold text-surface-on dark:text-surface-on-dark">₹{yesterdayStats.sales.toLocaleString('en-IN')}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Expenses</p>
+                                <p className="font-semibold text-error dark:text-error-dark">₹{yesterdayStats.expenses.toLocaleString('en-IN')}</p>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
-             <div>
-                <SummaryCard 
-                    value={avg7DayProfit} 
-                    label="7-Day Avg" 
-                    subLabel="Daily Profit"
-                />
+        ) : (
+             <div onClick={() => navigate('/records/new')} className="bg-surface-container dark:bg-surface-dark-container border-2 border-dashed border-surface-outline/20 dark:border-surface-outline-dark/20 rounded-[24px] p-6 text-center cursor-pointer active:scale-[0.98] transition-transform">
+                <p className="text-surface-on-variant dark:text-surface-on-variant-dark font-medium mb-2">No record for Yesterday</p>
+                <button className="text-sm font-bold text-primary dark:text-primary-dark">Tap to add record</button>
             </div>
-            <div>
-                <SummaryCard 
-                    value={avg30DayProfit} 
-                    label="30-Day Avg" 
-                    subLabel="Daily Profit"
-                />
+        )}
+
+        {/* SECTION 2: THIS WEEK'S PERFORMANCE (Replaces Last 7 Days) */}
+        <div>
+            <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                    <ChartBarIcon className="w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark"/>
+                    <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">This Week (Mon - Sun)</h3>
+                </div>
             </div>
-        </div>
-        
-        {/* Filter Section */}
-        <div className="flex overflow-x-auto no-scrollbar gap-2 py-1">
-            <FilterChip label="7 Days" value="7D" active={activeFilter === '7D'} onClick={() => handleQuickFilterClick('7D')} />
-            <FilterChip label="30 Days" value="30D" active={activeFilter === '30D'} onClick={() => handleQuickFilterClick('30D')} />
-            <FilterChip label={activeYear === 'all' ? "All Time" : `Year ${activeYear}`} value="ALL" active={activeFilter === 'ALL'} onClick={() => handleQuickFilterClick('ALL')} />
-            <FilterChip label="Custom" value="CUSTOM" active={activeFilter === 'CUSTOM'} onClick={() => handleQuickFilterClick('CUSTOM')} />
+            
+            <div className="space-y-3">
+                {/* 1. Profit Card (Hero of this section) */}
+                <div className="bg-surface-container dark:bg-surface-dark-container p-5 rounded-[24px]">
+                    <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark">Weekly Net Profit</span>
+                        <span className="text-[10px] bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark px-2 py-0.5 rounded-full font-bold">
+                            {thisWeekStats.count} Days Rec.
+                        </span>
+                    </div>
+                    {thisWeekStats.rangeText !== 'No records' && (
+                        <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark mb-2 opacity-80">
+                            {thisWeekStats.rangeText}
+                        </p>
+                    )}
+                    
+                    <div className="flex items-baseline gap-2">
+                        <span className={`text-3xl font-bold ${thisWeekStats.profit >= 0 ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
+                            {thisWeekStats.profit >= 0 ? '+' : ''}₹{thisWeekStats.profit.toLocaleString('en-IN')}
+                        </span>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-surface-outline/10 dark:border-surface-outline-dark/10 flex justify-between items-center">
+                        <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Daily Average</span>
+                        <span className="text-sm font-semibold text-surface-on dark:text-surface-on-dark">
+                             ~ ₹{Math.round(thisWeekStats.avgProfit).toLocaleString('en-IN')} / day
+                        </span>
+                    </div>
+                </div>
+
+                {/* 2. Sales & Expenses Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Sales */}
+                    <div className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px]">
+                        <p className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Total Sales</p>
+                        <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark">
+                            ₹{formatIndianNumberCompact(thisWeekStats.sales)}
+                        </p>
+                        <div className="mt-2 text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark opacity-80">
+                            Avg: ₹{Math.round(thisWeekStats.avgSales).toLocaleString('en-IN')}/day
+                        </div>
+                    </div>
+
+                    {/* Expenses */}
+                    <div className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px]">
+                        <p className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Total Expenses</p>
+                        <p className="text-xl font-bold text-error dark:text-error-dark">
+                            ₹{formatIndianNumberCompact(thisWeekStats.expenses)}
+                        </p>
+                        <div className="mt-2 text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark opacity-80">
+                            Avg: ₹{Math.round(thisWeekStats.avgExpenses).toLocaleString('en-IN')}/day
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         {/* Charts Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-2">
+             <div className="flex items-center justify-between px-1">
+                 <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">Trends</h3>
+                 <div className="flex gap-2">
+                     <FilterPill label="Week" value="WEEK" active={chartFilter === 'WEEK'} onClick={setChartFilter} />
+                     <FilterPill label="Month" value="MONTH" active={chartFilter === 'MONTH'} onClick={setChartFilter} />
+                     <FilterPill label="Year" value="YEAR" active={chartFilter === 'YEAR'} onClick={setChartFilter} />
+                 </div>
+             </div>
+
             <div className="bg-surface-container-low dark:bg-surface-dark-container-low rounded-[20px] p-4">
-                <h3 className="text-sm font-medium text-surface-on dark:text-surface-on-dark mb-4 px-1">Daily Performance</h3>
+                <div className="flex justify-between items-center mb-4 px-1">
+                     <h3 className="text-sm font-medium text-surface-on dark:text-surface-on-dark">Profit Trend</h3>
+                </div>
                 <ExpenseProfitChart data={chartData} />
             </div>
 
@@ -234,57 +318,6 @@ const Dashboard: React.FC = () => {
                 <SalesChart data={salesChartData} />
             </div>
         </div>
-
-        {/* Recent Activity List */}
-        <div className="pt-2">
-            <div className="flex justify-between items-center mb-3 px-1">
-                <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">Recent Activity</h3>
-                <button onClick={() => navigate('/records')} className="text-sm font-medium text-primary dark:text-primary-dark hover:underline">View All</button>
-            </div>
-            <div className="bg-surface-container-low dark:bg-surface-dark-container-low rounded-[20px] overflow-hidden">
-                {records.slice(0, 5).map((record, index) => {
-                    const totalExpenses = calculateTotalExpenses(record);
-                    const profit = (record.totalSales || 0) - totalExpenses;
-                    const isLast = index === Math.min(records.length, 5) - 1;
-                    return (
-                        <div 
-                            key={record.id} 
-                            onClick={() => navigate(`/records/${record.id}`)}
-                            className={`p-4 flex items-center active:bg-surface-variant/20 transition-colors ${!isLast ? 'border-b border-surface-outline/5 dark:border-surface-outline-dark/5' : ''}`}
-                        >
-                            <div className="w-10 h-10 rounded-full bg-surface-container-high dark:bg-surface-dark-container-high text-surface-on dark:text-surface-on-dark flex items-center justify-center mr-4 text-xs font-bold">
-                                {new Date(record.date).getDate()}
-                            </div>
-                            <div className="flex-grow min-w-0">
-                                <p className="font-medium text-surface-on dark:text-surface-on-dark text-sm truncate">
-                                    {new Date(record.date).toLocaleDateString('en-GB', { weekday: 'short', month: 'short' })}
-                                </p>
-                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">
-                                    Sales: ₹{record.totalSales.toLocaleString('en-IN')}
-                                </p>
-                            </div>
-                             <div className="text-right flex-shrink-0 ml-2">
-                                {record.totalSales === 0 ? (
-                                    <span className="text-[10px] font-medium px-2 py-1 bg-tertiary-container dark:bg-tertiary-container-dark text-tertiary-on-container dark:text-tertiary-on-container-dark rounded-md">Pending</span>
-                                ) : (
-                                    <p className={`font-medium text-sm ${profit >= 0 ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
-                                        {profit >= 0 ? '+' : ''}₹{Math.abs(profit).toLocaleString('en-IN')}
-                                    </p>
-                                )}
-                            </div>
-                            <ChevronRightIcon className="w-4 h-4 text-surface-outline dark:text-surface-outline-dark ml-2" />
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
-        
-        <DateRangePicker 
-            isOpen={isDateRangePickerOpen} 
-            onClose={() => setIsDateRangePickerOpen(false)}
-            onApply={handleApplyDateRange}
-            initialRange={dateRange}
-        />
     </div>
   );
 };

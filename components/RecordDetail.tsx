@@ -112,6 +112,11 @@ const RecordDetail: React.FC = () => {
         <div className="text-center border-b border-surface-outline/10 dark:border-surface-outline-dark/10 pb-4 mb-4">
           <p className="text-sm text-surface-on-variant dark:text-surface-on-variant-dark">Report for</p>
           <h2 className="text-xl font-bold text-surface-on dark:text-surface-on-dark">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+          {record.isClosed && (
+               <span className="inline-block mt-2 px-3 py-1 bg-surface-container-highest dark:bg-surface-dark-container-highest rounded-full text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark border border-surface-outline/20">
+                   Shop Closed
+               </span>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
@@ -120,10 +125,12 @@ const RecordDetail: React.FC = () => {
                   <p className="text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Total Sales</p>
                   <p className="text-2xl font-bold text-primary dark:text-primary-dark">₹{record.totalSales.toLocaleString('en-IN')}</p>
                 </div>
-                <div className="text-xs space-y-1 text-left border-t border-surface-outline/10 dark:border-surface-outline-dark/10 pt-2 mt-2">
-                    <p className="flex justify-between"><span className="text-surface-on-variant dark:text-surface-on-variant-dark">Morning:</span> <span className="font-semibold text-surface-on dark:text-surface-on-dark">₹{(record.morningSales || 0).toLocaleString('en-IN')}</span></p>
-                    <p className="flex justify-between"><span className="text-surface-on-variant dark:text-surface-on-variant-dark">Night:</span> <span className="font-semibold text-surface-on dark:text-surface-on-dark">₹{nightSales.toLocaleString('en-IN')}</span></p>
-                </div>
+                {!record.isClosed && (
+                    <div className="text-xs space-y-1 text-left border-t border-surface-outline/10 dark:border-surface-outline-dark/10 pt-2 mt-2">
+                        <p className="flex justify-between"><span className="text-surface-on-variant dark:text-surface-on-variant-dark">Morning:</span> <span className="font-semibold text-surface-on dark:text-surface-on-dark">₹{(record.morningSales || 0).toLocaleString('en-IN')}</span></p>
+                        <p className="flex justify-between"><span className="text-surface-on-variant dark:text-surface-on-variant-dark">Night:</span> <span className="font-semibold text-surface-on dark:text-surface-on-dark">₹{nightSales.toLocaleString('en-IN')}</span></p>
+                    </div>
+                )}
             </div>
             <div className="bg-surface-container-high dark:bg-surface-dark-container-high p-4 rounded-xl">
                 <p className="text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Total Expenses</p>

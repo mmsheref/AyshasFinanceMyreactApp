@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DailyRecord } from '../types';
@@ -12,13 +13,23 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => v
     const profit = record.totalSales - totalExpenses;
     const isProfit = profit >= 0;
 
-    const profitOrStatus = record.totalSales === 0 ? (
-        <span className="px-2 py-1 rounded-md bg-tertiary-container dark:bg-tertiary-container-dark text-tertiary-on-container dark:text-tertiary-on-container-dark text-[10px] font-bold uppercase tracking-wide">Pending</span>
-    ) : (
-        <span className={`text-base font-bold ${isProfit ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
-            {isProfit ? '+' : '-'}₹{Math.abs(profit).toLocaleString('en-IN')}
-        </span>
-    );
+    let profitOrStatus;
+    
+    if (record.isClosed) {
+        profitOrStatus = (
+            <span className="px-2 py-1 rounded-md bg-surface-container-highest dark:bg-surface-dark-container-highest text-surface-on-variant dark:text-surface-on-variant-dark text-[10px] font-bold uppercase tracking-wide border border-surface-outline/20">Closed</span>
+        );
+    } else if (record.totalSales === 0) {
+        profitOrStatus = (
+            <span className="px-2 py-1 rounded-md bg-tertiary-container dark:bg-tertiary-container-dark text-tertiary-on-container dark:text-tertiary-on-container-dark text-[10px] font-bold uppercase tracking-wide">Pending</span>
+        );
+    } else {
+        profitOrStatus = (
+            <span className={`text-base font-bold ${isProfit ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
+                {isProfit ? '+' : '-'}₹{Math.abs(profit).toLocaleString('en-IN')}
+            </span>
+        );
+    }
 
 
     return (
@@ -42,17 +53,19 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => v
                 </div>
             </div>
             
-            <div className="flex justify-between items-center pt-3 border-t border-surface-outline/5 dark:border-surface-outline-dark/5">
-                 <div className="flex flex-col">
-                    <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Sales</span>
-                    <span className="text-sm font-semibold text-surface-on dark:text-surface-on-dark">₹{record.totalSales.toLocaleString('en-IN')}</span>
-                 </div>
-                 <div className="h-6 w-px bg-surface-outline/10 dark:bg-surface-outline-dark/10"></div>
-                 <div className="flex flex-col text-right">
-                    <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Expenses</span>
-                    <span className="text-sm font-semibold text-surface-on dark:text-surface-on-dark">₹{totalExpenses.toLocaleString('en-IN')}</span>
-                 </div>
-            </div>
+            {!record.isClosed && (
+                <div className="flex justify-between items-center pt-3 border-t border-surface-outline/5 dark:border-surface-outline-dark/5">
+                     <div className="flex flex-col">
+                        <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Sales</span>
+                        <span className="text-sm font-semibold text-surface-on dark:text-surface-on-dark">₹{record.totalSales.toLocaleString('en-IN')}</span>
+                     </div>
+                     <div className="h-6 w-px bg-surface-outline/10 dark:bg-surface-outline-dark/10"></div>
+                     <div className="flex flex-col text-right">
+                        <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Expenses</span>
+                        <span className="text-sm font-semibold text-surface-on dark:text-surface-on-dark">₹{totalExpenses.toLocaleString('en-IN')}</span>
+                     </div>
+                </div>
+            )}
         </div>
     );
 });

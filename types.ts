@@ -1,3 +1,4 @@
+
 export interface ExpenseItem {
   id: string;
   name: string;
@@ -17,6 +18,7 @@ export interface DailyRecord {
   totalSales: number;
   morningSales: number;
   expenses: ExpenseCategory[];
+  isClosed?: boolean; // New field to mark holidays/off days
 }
 
 export interface ExpenseStructureItem {
