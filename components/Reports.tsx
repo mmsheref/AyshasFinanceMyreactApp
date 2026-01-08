@@ -411,13 +411,7 @@ const Reports: React.FC = () => {
     const displayedExpenses = showAllExpenses ? reportData.sortedExpenseItems : reportData.sortedExpenseItems.slice(0, 5);
 
     return (
-        <div className="space-y-4 pb-6">
-             {/* Header */}
-             <div>
-                <h1 className="text-3xl font-normal text-surface-on dark:text-surface-on-dark">Reports</h1>
-                <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">Deep Dive Analytics</p>
-            </div>
-
+        <div className="space-y-4 pb-6 pt-4">
             {/* Filter Chips - Horizontal Scroll */}
             <div className="flex overflow-x-auto no-scrollbar gap-2 py-1">
                 {filterOptions.map(f => (

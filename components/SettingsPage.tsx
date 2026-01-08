@@ -216,11 +216,6 @@ const SettingsPage: React.FC = () => {
 
     return (
         <div className="pb-10 pt-4">
-             {/* Large Header */}
-            <div className="mb-6">
-                <h1 className="text-[32px] leading-tight font-normal text-surface-on dark:text-surface-on-dark">Settings</h1>
-            </div>
-
             <SettingsGroup title="General">
                 <SettingsItem icon={<CalendarIcon className="w-5 h-5"/>} title="Reporting Period" description={activeYear === 'all' ? 'Showing all records' : `Active Fiscal Year: ${activeYear}`} onClick={() => setYearModalOpen(true)} />
                 <SettingsItem icon={<PaintBrushIcon className="w-5 h-5"/>} title="Theme" description="Appearance">
