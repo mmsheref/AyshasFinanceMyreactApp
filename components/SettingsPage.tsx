@@ -243,7 +243,7 @@ const SettingsPage: React.FC = () => {
             </SettingsGroup>
 
             <SettingsGroup title="App Info">
-                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About" description="Version 2.2.0 • Credits" onClick={() => setAboutModalOpen(true)} />
+                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About" description="Version 2.3.0 • Credits" onClick={() => setAboutModalOpen(true)} />
             </SettingsGroup>
             
             {isStructureModalOpen && (
@@ -279,7 +279,7 @@ const SettingsPage: React.FC = () => {
                         
                         <h2 className="text-2xl font-bold text-surface-on dark:text-surface-on-dark mb-1">Ayshas Finance Tracker</h2>
                         <p className="text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-high dark:bg-surface-dark-container-high py-1 px-3 rounded-full inline-block mb-8">
-                            Version 2.2.0
+                            Version 2.3.0
                         </p>
 
                         <div className="space-y-6">

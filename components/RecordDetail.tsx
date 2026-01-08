@@ -8,8 +8,7 @@ import Modal from './Modal';
 import { shareImageFile } from '../utils/capacitor-utils';
 import ShareableReport from './ShareableReport';
 import { calculateTotalExpenses } from '../utils/record-utils';
-
-declare var html2canvas: any;
+import html2canvas from 'html2canvas';
 
 const RecordDetail: React.FC = () => {
   const { recordId } = useParams<{ recordId: string }>();
