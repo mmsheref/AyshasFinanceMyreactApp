@@ -108,7 +108,7 @@ const RecordDetail: React.FC = () => {
       )}
 
       <div id="report-container" className="bg-surface-container dark:bg-surface-dark-container p-4 sm:p-6 rounded-[24px] shadow-sm">
-        <div className="text-center border-b border-surface-outline/10 dark:border-surface-outline-dark/10 pb-4 mb-4">
+        <div className="text-center border-b border-surface-outline/10 dark:border-surface-outline-dark/10 pb-6 mb-4">
           <p className="text-sm text-surface-on-variant dark:text-surface-on-variant-dark">Report for</p>
           <h2 className="text-xl font-bold text-surface-on dark:text-surface-on-dark">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
           {record.isClosed && (
@@ -116,6 +116,32 @@ const RecordDetail: React.FC = () => {
                    Shop Closed
                </span>
           )}
+
+          {/* Action Row - Moved to Top */}
+          <div className="flex items-center justify-center gap-4 mt-5 no-capture">
+             <button 
+                onClick={handleShare} 
+                disabled={isSharing} 
+                className="w-12 h-12 rounded-full bg-surface-container-highest dark:bg-surface-dark-container-highest text-primary dark:text-primary-dark flex items-center justify-center hover:bg-primary/10 transition-colors disabled:opacity-50"
+                title="Share Report"
+             >
+                <ShareIcon className="w-5 h-5" />
+             </button>
+             <button 
+                onClick={() => navigate(`/records/${record.id}/edit`)} 
+                className="w-12 h-12 rounded-full bg-surface-container-highest dark:bg-surface-dark-container-highest text-primary dark:text-primary-dark flex items-center justify-center hover:bg-primary/10 transition-colors"
+                title="Edit Record"
+             >
+                <EditIcon className="w-5 h-5" />
+             </button>
+             <button 
+                onClick={() => setIsDeleteModalOpen(true)} 
+                className="w-12 h-12 rounded-full bg-error-container dark:bg-error-container-dark text-error dark:text-error-dark flex items-center justify-center hover:bg-error/20 transition-colors"
+                title="Delete Record"
+             >
+                <DeleteIcon className="w-5 h-5" />
+             </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
@@ -174,22 +200,6 @@ const RecordDetail: React.FC = () => {
              );
           })}
         </div>
-
-      </div>
-
-      <div className="bg-surface-container dark:bg-surface-dark-container p-2 rounded-xl shadow-sm flex justify-around items-center no-capture">
-        <button onClick={handleShare} disabled={isSharing} className="flex flex-col items-center text-surface-on-variant dark:text-surface-on-variant-dark hover:text-primary dark:hover:text-primary-dark transition-colors disabled:opacity-50 w-24 p-2 rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-dark-container-high" aria-label="Share report">
-            <ShareIcon className="w-6 h-6 mb-1"/>
-            <span className="text-xs font-medium">{isSharing ? 'Preparing...' : 'Share'}</span>
-        </button>
-        <button onClick={() => navigate(`/records/${record.id}/edit`)} className="flex flex-col items-center text-surface-on-variant dark:text-surface-on-variant-dark hover:text-primary dark:hover:text-primary-dark transition-colors w-24 p-2 rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-dark-container-high" aria-label="Edit record">
-            <EditIcon className="w-6 h-6 mb-1"/>
-            <span className="text-xs font-medium">Edit</span>
-        </button>
-        <button onClick={() => setIsDeleteModalOpen(true)} className="flex flex-col items-center text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark transition-colors w-24 p-2 rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-dark-container-high" aria-label="Delete record">
-            <DeleteIcon className="w-6 h-6 mb-1"/>
-            <span className="text-xs font-medium">Delete</span>
-        </button>
       </div>
 
       {viewingPhotos && (
