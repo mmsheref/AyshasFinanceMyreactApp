@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { DailyRecord, CustomExpenseStructure, BackupData, ReportCardVisibilitySettings } from '../types';
+import { DailyRecord, CustomExpenseStructure, BackupData, ReportCardVisibilitySettings, GasConfig, GasLog } from '../types';
 import * as db from '../utils/db';
 import { migrateStructure, runMigration } from '../utils/migrations';
 import { DEFAULT_EXPENSE_STRUCTURE, CATEGORIES_WITH_BILL_UPLOAD } from '../constants';
@@ -23,6 +23,11 @@ const DEFAULT_CARD_VISIBILITY: ReportCardVisibilitySettings = {
     LEAST_PROFITABLE_DAY: true,
 };
 
+const DEFAULT_GAS_CONFIG: GasConfig = {
+    currentStock: 0,
+    cylindersPerBank: 2, // Default to 2 cylinders connected
+};
+
 interface AppContextType {
     records: DailyRecord[];
     sortedRecords: DailyRecord[];
@@ -32,6 +37,9 @@ interface AppContextType {
     billUploadCategories: string[];
     trackedItems: string[];
     reportCardVisibility: ReportCardVisibilitySettings;
+    gasConfig: GasConfig;
+    gasLogs: GasLog[];
+    gasStats: { avgDaysPerCylinder: number; avgDailyUsage: number; daysSinceLastSwap: number };
     activeYear: string; // 'all' or 'YYYY'
     availableYears: string[];
     isLoading: boolean;
@@ -48,6 +56,9 @@ interface AppContextType {
     handleUpdateBillUploadCategories: (newCategories: string[]) => Promise<void>;
     handleUpdateTrackedItems: (newItems: string[]) => Promise<void>;
     handleUpdateReportCardVisibility: (newVisibility: ReportCardVisibilitySettings) => Promise<void>;
+    handleUpdateGasConfig: (config: GasConfig) => Promise<void>;
+    handleLogGasSwap: () => Promise<void>;
+    handleGasRefill: (count: number) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -59,6 +70,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [billUploadCategories, setBillUploadCategories] = useState<string[]>([]);
     const [trackedItems, setTrackedItems] = useState<string[]>([]);
     const [reportCardVisibility, setReportCardVisibility] = useState<ReportCardVisibilitySettings>(DEFAULT_CARD_VISIBILITY);
+    const [gasConfig, setGasConfig] = useState<GasConfig>(DEFAULT_GAS_CONFIG);
+    const [gasLogs, setGasLogs] = useState<GasLog[]>([]);
     const [activeYear, setActiveYearInternal] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
@@ -114,6 +127,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 const dbCardVisibility = await db.getSetting('reportCardVisibility');
                 if (dbCardVisibility) setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
+                
+                const dbGasConfig = await db.getSetting('gasConfig');
+                if (dbGasConfig) setGasConfig(dbGasConfig);
+                
+                const dbGasLogs = await db.getGasLogs();
+                setGasLogs(dbGasLogs || []);
 
                 const dbActiveYear = await db.getSetting('activeYear');
                 if (dbActiveYear) setActiveYearInternal(dbActiveYear);
@@ -152,6 +171,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             : records.filter(r => r.date.startsWith(activeYear));
         return [...base].sort((a, b) => b.date.localeCompare(a.date));
     }, [records, activeYear]);
+
+    // --- Gas Calculations ---
+    const gasStats = useMemo(() => {
+        if (gasLogs.length < 2) {
+            // Need at least 2 logs to calculate usage interval
+            // Or 1 log + current date? Let's strictly calculate between known swaps for accuracy
+            
+            // Calculate Days since last swap
+            let daysSinceLastSwap = 0;
+            if (gasLogs.length === 1) {
+                 const lastLog = new Date(gasLogs[0].date);
+                 const today = new Date();
+                 const diffTime = Math.abs(today.getTime() - lastLog.getTime());
+                 daysSinceLastSwap = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            }
+
+            return { avgDaysPerCylinder: 0, avgDailyUsage: 0, daysSinceLastSwap };
+        }
+
+        const sortedLogs = [...gasLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Calculate total days between first and last log
+        const firstLog = new Date(sortedLogs[0].date);
+        const lastLog = new Date(sortedLogs[sortedLogs.length - 1].date);
+        
+        // Time span in days
+        const diffTime = Math.abs(lastLog.getTime() - firstLog.getTime());
+        const totalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+        // Cylinders consumed (Excluding the very first setup log if we assume start-state, 
+        // but typically a log means "I finished X cylinders". 
+        // So we sum up cylindersSwapped from index 1 to end (the usage during the period).
+        // Actually, if I swap on Jan 1, and swap on Jan 5. 
+        // That means I used the cylinders from Jan 1 during those 4 days.
+        
+        // Sum cylinders swapped from index 1 to end
+        let totalCylindersUsed = 0;
+        for (let i = 1; i < sortedLogs.length; i++) {
+            totalCylindersUsed += sortedLogs[i].cylindersSwapped;
+        }
+        
+        if (totalCylindersUsed === 0) return { avgDaysPerCylinder: 0, avgDailyUsage: 0, daysSinceLastSwap: 0 };
+
+        const avgDaysPerCylinder = totalDays / totalCylindersUsed;
+        const avgDailyUsage = totalCylindersUsed / totalDays;
+        
+        // Days since last swap
+        const today = new Date();
+        const lastSwapTime = Math.abs(today.getTime() - lastLog.getTime());
+        const daysSinceLastSwap = Math.ceil(lastSwapTime / (1000 * 60 * 60 * 24));
+
+        return { avgDaysPerCylinder, avgDailyUsage, daysSinceLastSwap };
+
+    }, [gasLogs]);
     
     const setActiveYear = async (year: string) => {
         await db.saveSetting('activeYear', year);
@@ -193,6 +266,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await db.clearRecords();
         await db.bulkAddRecords(migratedRecords);
         await db.saveCustomStructure(migratedStructure);
+        
+        // Restore gas data if present
+        if (data.gasConfig) {
+            await db.saveSetting('gasConfig', data.gasConfig);
+            setGasConfig(data.gasConfig);
+        }
+        if (data.gasLogs) {
+             await db.clearGasLogs();
+             await db.bulkAddGasLogs(data.gasLogs);
+             setGasLogs(data.gasLogs);
+        }
+
         setRecords(migratedRecords);
         setCustomStructure(migratedStructure);
         return data.records.length;
@@ -223,6 +308,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setReportCardVisibility(newVisibility);
     };
 
+    // --- Gas Actions ---
+    const handleUpdateGasConfig = async (config: GasConfig) => {
+        await db.saveSetting('gasConfig', config);
+        setGasConfig(config);
+    };
+
+    const handleLogGasSwap = async () => {
+        // 1. Create Log
+        const newLog: GasLog = {
+            id: uuidv4(),
+            date: new Date().toISOString(),
+            cylindersSwapped: gasConfig.cylindersPerBank
+        };
+        await db.saveGasLog(newLog);
+        
+        // 2. Decrement Stock
+        const newStock = Math.max(0, gasConfig.currentStock - gasConfig.cylindersPerBank);
+        const newConfig = { ...gasConfig, currentStock: newStock };
+        await db.saveSetting('gasConfig', newConfig);
+
+        setGasLogs(prev => [...prev, newLog]);
+        setGasConfig(newConfig);
+    };
+
+    const handleGasRefill = async (count: number) => {
+        const newStock = gasConfig.currentStock + count;
+        const newConfig = { ...gasConfig, currentStock: newStock };
+        await db.saveSetting('gasConfig', newConfig);
+        setGasConfig(newConfig);
+    };
+
+
     const value: AppContextType = {
         records,
         sortedRecords,
@@ -232,6 +349,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         billUploadCategories,
         trackedItems,
         reportCardVisibility,
+        gasConfig,
+        gasLogs,
+        gasStats,
         activeYear,
         availableYears,
         isLoading,
@@ -248,6 +368,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         handleUpdateBillUploadCategories,
         handleUpdateTrackedItems,
         handleUpdateReportCardVisibility,
+        handleUpdateGasConfig,
+        handleLogGasSwap,
+        handleGasRefill,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

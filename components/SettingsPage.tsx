@@ -5,9 +5,9 @@ import BackupRestore from './BackupRestore';
 import { useAppContext } from '../context/AppContext';
 import ExpenseStructureManager from './ExpenseStructureManager';
 import TrackedItemsManager from './TrackedItemsManager';
-import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon, CalendarIcon, ClockIcon } from './Icons';
+import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon, CalendarIcon, ClockIcon, FireIcon } from './Icons';
 import Modal from './Modal';
-import { ReportMetric, ReportCardVisibilitySettings, CustomExpenseStructure } from '../types';
+import { ReportMetric, ReportCardVisibilitySettings, CustomExpenseStructure, GasConfig } from '../types';
 import { METRIC_LABELS } from '../constants';
 
 interface SettingsItemProps {
@@ -192,6 +192,55 @@ const ReportCardManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
     );
 };
 
+const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
+    const { gasConfig, handleUpdateGasConfig } = useAppContext();
+    const [localConfig, setLocalConfig] = useState<GasConfig>(gasConfig);
+    
+    const handleSave = async () => {
+        await handleUpdateGasConfig(localConfig);
+        onClose();
+    };
+
+    const inputStyles = "w-full px-3 py-2 border border-surface-outline/50 dark:border-surface-outline-dark/50 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 dark:bg-surface-dark-container-high dark:text-surface-on-dark transition";
+
+    return (
+        <Modal onClose={onClose}>
+             <div className="bg-surface-container dark:bg-surface-dark-container rounded-[28px] max-h-[90vh] flex flex-col p-6">
+                <h2 className="text-xl font-medium text-surface-on dark:text-surface-on-dark mb-6">Gas Configuration</h2>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Total Cylinders Available (Stock)</label>
+                        <input 
+                            type="number" 
+                            value={localConfig.currentStock} 
+                            onChange={(e) => setLocalConfig({...localConfig, currentStock: parseInt(e.target.value) || 0})}
+                            className={inputStyles}
+                        />
+                        <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">Number of full cylinders currently in inventory.</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Active Connection Size</label>
+                        <input 
+                            type="number" 
+                            value={localConfig.cylindersPerBank} 
+                            onChange={(e) => setLocalConfig({...localConfig, cylindersPerBank: parseInt(e.target.value) || 0})}
+                            className={inputStyles}
+                        />
+                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">How many cylinders are connected and used at one time (e.g., 2).</p>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-8">
+                    <button onClick={onClose} className="px-4 py-2 text-primary dark:text-primary-dark font-medium hover:bg-primary-container/10 dark:hover:bg-primary-container-dark/10 rounded-full">Cancel</button>
+                    <button onClick={handleSave} className="px-6 py-2 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-medium">Save</button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const SettingsPage: React.FC = () => {
     const { 
         records, 
@@ -207,6 +256,7 @@ const SettingsPage: React.FC = () => {
     const [isFoodCostModalOpen, setFoodCostModalOpen] = useState(false);
     const [isReportCardModalOpen, setReportCardModalOpen] = useState(false);
     const [isTrackedItemsModalOpen, setTrackedItemsModalOpen] = useState(false);
+    const [isGasConfigModalOpen, setGasConfigModalOpen] = useState(false);
     const [isAboutModalOpen, setAboutModalOpen] = useState(false);
     const [isYearModalOpen, setYearModalOpen] = useState(false);
 
@@ -236,6 +286,7 @@ const SettingsPage: React.FC = () => {
             
             <SettingsGroup title="Analytics Config">
                  <SettingsItem icon={<ClockIcon className="w-5 h-5"/>} title="Inventory Watch" description="Select items to track last purchase" onClick={() => setTrackedItemsModalOpen(true)} />
+                 <SettingsItem icon={<FireIcon className="w-5 h-5"/>} title="Gas Configuration" description="Manage stock & capacity" onClick={() => setGasConfigModalOpen(true)} />
                  <SettingsItem icon={<TagIcon className="w-5 h-5"/>} title="Food Cost Categories" description="Select categories for cost analysis" onClick={() => setFoodCostModalOpen(true)} />
                  <SettingsItem icon={<AdjustmentsHorizontalIcon className="w-5 h-5"/>} title="Report Cards" description="Toggle visibility of KPI cards" onClick={() => setReportCardModalOpen(true)} />
             </SettingsGroup>
@@ -268,6 +319,7 @@ const SettingsPage: React.FC = () => {
             {isFoodCostModalOpen && <FoodCostCategoryManager onClose={() => setFoodCostModalOpen(false)} />}
             {isReportCardModalOpen && <ReportCardManager onClose={() => setReportCardModalOpen(false)} />}
             {isTrackedItemsModalOpen && <TrackedItemsManager onClose={() => setTrackedItemsModalOpen(false)} />}
+            {isGasConfigModalOpen && <GasConfigManager onClose={() => setGasConfigModalOpen(false)} />}
             
             {isAboutModalOpen && (
                 <Modal onClose={() => setAboutModalOpen(false)}>

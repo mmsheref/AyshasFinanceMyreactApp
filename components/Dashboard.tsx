@@ -5,7 +5,8 @@ import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
 import { useAppContext } from '../context/AppContext';
 import { calculateTotalExpenses, getTodayDateString, subtractDays, getThisWeekRange, getThisMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
-import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon } from './Icons';
+import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon, FireIcon } from './Icons';
+import Modal from './Modal';
 
 type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
@@ -17,6 +18,98 @@ const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean,
         {label}
     </button>
 );
+
+const GasTrackerCard: React.FC = () => {
+    const { gasConfig, gasStats, handleLogGasSwap, handleGasRefill } = useAppContext();
+    const [isActionModalOpen, setActionModalOpen] = useState(false);
+    const [refillCount, setRefillCount] = useState<number>(gasConfig.cylindersPerBank);
+
+    const onSwapConfirm = async () => {
+        if (confirm(`Confirm that you have replaced ${gasConfig.cylindersPerBank} empty cylinders?`)) {
+            await handleLogGasSwap();
+            setActionModalOpen(false);
+        }
+    };
+
+    const onRefillConfirm = async () => {
+        await handleGasRefill(refillCount);
+        setActionModalOpen(false);
+    };
+
+    return (
+        <>
+            <div 
+                className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] active:scale-[0.99] transition-transform cursor-pointer"
+                onClick={() => setActionModalOpen(true)}
+            >
+                <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                        <FireIcon className="w-5 h-5 text-tertiary dark:text-tertiary-dark" />
+                        <h3 className="text-sm font-bold text-surface-on dark:text-surface-on-dark">Gas Tracker</h3>
+                    </div>
+                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gasConfig.currentStock <= gasConfig.cylindersPerBank ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-primary/10 text-primary dark:text-primary-dark'}`}>
+                        Stock: {gasConfig.currentStock}
+                    </span>
+                </div>
+                
+                <div className="flex justify-between items-end">
+                    <div>
+                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mb-0.5">Avg Daily Usage</p>
+                         <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark">
+                             {gasStats.avgDailyUsage > 0 ? `${gasStats.avgDailyUsage.toFixed(1)}` : '-'} <span className="text-xs font-normal opacity-70">Cyl/Day</span>
+                         </p>
+                    </div>
+                     <div className="text-right">
+                         <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Last Swap</p>
+                         <p className="text-xs font-medium text-surface-on dark:text-surface-on-dark">{gasStats.daysSinceLastSwap} days ago</p>
+                    </div>
+                </div>
+            </div>
+
+            {isActionModalOpen && (
+                <Modal onClose={() => setActionModalOpen(false)} size="alert">
+                    <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
+                        <h3 className="text-lg font-bold mb-4 text-center text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
+                        
+                        <div className="space-y-4">
+                            <button 
+                                onClick={onSwapConfirm}
+                                className="w-full p-4 bg-tertiary-container dark:bg-tertiary-container-dark text-tertiary-on-container dark:text-tertiary-on-container-dark rounded-xl text-left hover:opacity-90 transition-opacity"
+                            >
+                                <p className="font-bold text-base">Log Swap (Use Stock)</p>
+                                <p className="text-xs opacity-80 mt-1">
+                                    Empty cylinders replaced with {gasConfig.cylindersPerBank} full ones.
+                                </p>
+                            </button>
+
+                             <div className="p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
+                                <p className="font-bold text-base text-surface-on dark:text-surface-on-dark mb-2">Add Stock (Refill)</p>
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="number" 
+                                        value={refillCount}
+                                        onChange={(e) => setRefillCount(parseInt(e.target.value) || 0)}
+                                        className="w-16 p-2 text-center rounded-lg bg-surface dark:bg-surface-dark border border-surface-outline/20 dark:border-surface-outline-dark/20"
+                                    />
+                                    <button 
+                                        onClick={onRefillConfirm}
+                                        className="flex-grow py-2 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-lg font-medium text-sm"
+                                    >
+                                        Add to Inventory
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                         <div className="mt-6 flex justify-center">
+                            <button onClick={() => setActionModalOpen(false)} className="px-4 py-2 text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Close</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+        </>
+    );
+};
 
 const Dashboard: React.FC = () => {
   const { sortedRecords: records, allSortedRecords, activeYear, trackedItems } = useAppContext();
@@ -238,34 +331,33 @@ const Dashboard: React.FC = () => {
             </div>
         </div>
 
-        {/* SECTION 0: INVENTORY WATCH */}
-        {trackedItemsData.length > 0 && (
-            <div>
-                 <div className="flex items-center gap-2 mb-3 px-1">
-                    <ClockIcon className="w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark"/>
-                    <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">Inventory Watch</h3>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {trackedItemsData.map((item) => (
-                        <div key={item.name} className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] flex flex-col justify-between">
-                            <p className="text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark truncate mb-2">{item.name}</p>
-                            {item.daysAgo !== null ? (
-                                <div>
-                                    <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark leading-none mb-1">
-                                        {item.daysAgo === 0 ? 'Today' : (item.daysAgo === 1 ? 'Yesterday' : `${item.daysAgo} Days`)}
-                                    </p>
-                                    <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">
-                                        {new Date(item.date!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} • ₹{item.amount.toLocaleString('en-IN')}
-                                    </p>
-                                </div>
-                            ) : (
-                                <p className="text-xs text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 italic">Not purchased yet</p>
-                            )}
-                        </div>
-                    ))}
-                </div>
+        {/* SECTION 0: RESOURCES WATCH (Inventory & Gas) */}
+        <div>
+            <div className="flex items-center gap-2 mb-3 px-1">
+                <ClockIcon className="w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark"/>
+                <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">Resources</h3>
             </div>
-        )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                 <GasTrackerCard />
+                {trackedItemsData.map((item) => (
+                    <div key={item.name} className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] flex flex-col justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark truncate mb-2">{item.name}</p>
+                        {item.daysAgo !== null ? (
+                            <div>
+                                <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark leading-none mb-1">
+                                    {item.daysAgo === 0 ? 'Today' : (item.daysAgo === 1 ? 'Yesterday' : `${item.daysAgo} Days`)}
+                                </p>
+                                <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">
+                                    {new Date(item.date!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} • ₹{item.amount.toLocaleString('en-IN')}
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 italic">Not purchased yet</p>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
 
         {/* SECTION 1: PULSE (LATEST RECORD) */}
         {pulseStats && (
