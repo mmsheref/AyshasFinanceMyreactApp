@@ -210,7 +210,20 @@ const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
                 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Total Cylinders Available (Stock)</label>
+                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Total Cylinders Owned</label>
+                        <input 
+                            type="number" 
+                            value={localConfig.totalCylinders || 0} 
+                            onChange={(e) => setLocalConfig({...localConfig, totalCylinders: parseInt(e.target.value) || 0})}
+                            className={inputStyles}
+                        />
+                        <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">
+                            Total cylinders you own (Active + Full + Empty).
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Current Stock (Full)</label>
                         <input 
                             type="number" 
                             value={localConfig.currentStock} 
@@ -221,14 +234,14 @@ const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Active Connection Size</label>
+                        <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Active Connections</label>
                         <input 
                             type="number" 
                             value={localConfig.cylindersPerBank} 
                             onChange={(e) => setLocalConfig({...localConfig, cylindersPerBank: parseInt(e.target.value) || 0})}
                             className={inputStyles}
                         />
-                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">How many cylinders are connected and used at one time (e.g., 2).</p>
+                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">Number of cylinders connected to the stove (Active).</p>
                     </div>
                 </div>
 

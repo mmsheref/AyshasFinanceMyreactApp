@@ -25,6 +25,9 @@ const GasTrackerCard: React.FC = () => {
     const [swapCount, setSwapCount] = useState<number>(1);
     const [refillCount, setRefillCount] = useState<number>(gasConfig.cylindersPerBank || 2);
 
+    // Calculate Empty Shells: Total - (Active + FullStock)
+    const emptyCylinders = Math.max(0, (gasConfig.totalCylinders || 0) - (gasConfig.cylindersPerBank || 0) - gasConfig.currentStock);
+
     const onSwapConfirm = async () => {
         await handleLogGasSwap(swapCount);
         setActionModalOpen(false);
@@ -38,28 +41,36 @@ const GasTrackerCard: React.FC = () => {
     return (
         <>
             <div 
-                className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] active:scale-[0.99] transition-transform cursor-pointer"
+                className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] active:scale-[0.99] transition-transform cursor-pointer col-span-2 sm:col-span-1"
                 onClick={() => setActionModalOpen(true)}
             >
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-2">
                         <FireIcon className="w-5 h-5 text-tertiary dark:text-tertiary-dark" />
-                        <h3 className="text-sm font-bold text-surface-on dark:text-surface-on-dark">Gas Tracker</h3>
+                        <h3 className="text-sm font-bold text-surface-on dark:text-surface-on-dark">Gas Inventory</h3>
                     </div>
-                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gasConfig.currentStock <= 1 ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-primary/10 text-primary dark:text-primary-dark'}`}>
-                        Stock: {gasConfig.currentStock}
-                    </span>
                 </div>
                 
-                <div className="flex justify-between items-end">
+                <div className="flex gap-2">
+                     <div className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center ${gasConfig.currentStock <= 1 ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-surface-container-high dark:bg-surface-dark-container-high'}`}>
+                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">Full</span>
+                        <span className="text-xl font-bold">{gasConfig.currentStock}</span>
+                     </div>
+                     <div className="flex-1 p-2 rounded-xl bg-surface-container-high dark:bg-surface-dark-container-high flex flex-col items-center justify-center text-surface-on dark:text-surface-on-dark">
+                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">Empty</span>
+                        <span className="text-xl font-bold">{emptyCylinders}</span>
+                     </div>
+                </div>
+
+                <div className="flex justify-between items-end mt-3">
                     <div>
-                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mb-0.5">Avg Daily Usage</p>
-                         <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark">
-                             {gasStats.avgDailyUsage > 0 ? `${gasStats.avgDailyUsage.toFixed(1)}` : '-'} <span className="text-xs font-normal opacity-70">Cyl/Day</span>
+                         <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark mb-0.5">Usage</p>
+                         <p className="text-sm font-bold text-surface-on dark:text-surface-on-dark">
+                             {gasStats.avgDailyUsage > 0 ? `${gasStats.avgDailyUsage.toFixed(1)}` : '-'} <span className="text-[10px] font-normal opacity-70">Cyl/Day</span>
                          </p>
                     </div>
                      <div className="text-right">
-                         <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Last Swap</p>
+                         <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Last Change</p>
                          <p className="text-xs font-medium text-surface-on dark:text-surface-on-dark">{gasStats.daysSinceLastSwap >= 0 ? `${gasStats.daysSinceLastSwap} days ago` : 'Never'}</p>
                     </div>
                 </div>
@@ -71,9 +82,12 @@ const GasTrackerCard: React.FC = () => {
                         <h3 className="text-lg font-bold mb-6 text-center text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
                         
                         <div className="space-y-6">
-                            {/* LOG SWAP SECTION */}
+                            {/* CONNECT ACTION (Was Kitchen) */}
                             <div className="bg-tertiary-container dark:bg-tertiary-container-dark p-4 rounded-xl text-tertiary-on-container dark:text-tertiary-on-container-dark">
-                                <p className="font-bold text-base mb-2">Log Swap (Use Stock)</p>
+                                <p className="font-bold text-base mb-2">Connect Fresh Cylinder</p>
+                                <p className="text-xs opacity-80 mb-3">
+                                    Gas finished? Use a full cylinder from stock.
+                                </p>
                                 <div className="flex items-center gap-3 mb-2">
                                      <div className="flex items-center bg-white/40 dark:bg-black/20 rounded-lg overflow-hidden shrink-0">
                                         <button 
@@ -92,17 +106,17 @@ const GasTrackerCard: React.FC = () => {
                                         onClick={onSwapConfirm}
                                         className="flex-grow h-10 bg-tertiary-on-container dark:bg-tertiary-on-container-dark text-tertiary-container dark:text-tertiary-container-dark rounded-lg font-bold text-sm shadow-sm hover:opacity-90"
                                     >
-                                        Confirm
+                                        Confirm Usage
                                     </button>
                                 </div>
-                                <p className="text-xs opacity-80">
-                                    Deducting {swapCount} cylinder{swapCount !== 1 ? 's' : ''} from stock.
-                                </p>
                             </div>
 
-                            {/* REFILL SECTION */}
+                            {/* REFILL ACTION (Was Agency) */}
                              <div className="p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
-                                <p className="font-bold text-base text-surface-on dark:text-surface-on-dark mb-2">Add Stock (Refill)</p>
+                                <p className="font-bold text-base text-surface-on dark:text-surface-on-dark mb-2">Refill Stock (Exchange)</p>
+                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mb-3">
+                                    Handover empty cylinders, receive full ones.
+                                </p>
                                 <div className="flex items-center gap-3">
                                     <input 
                                         type="number" 
@@ -114,7 +128,7 @@ const GasTrackerCard: React.FC = () => {
                                         onClick={onRefillConfirm}
                                         className="flex-grow h-10 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-lg font-bold text-sm hover:opacity-90"
                                     >
-                                        Add to Inventory
+                                        Confirm Exchange
                                     </button>
                                 </div>
                             </div>

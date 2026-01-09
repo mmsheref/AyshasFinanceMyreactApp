@@ -31,8 +31,9 @@ export type CustomExpenseStructure = {
 };
 
 export interface GasConfig {
-  currentStock: number; // Total full cylinders currently available
-  cylindersPerBank: number; // How many are connected at a time (e.g., 2 connected)
+  totalCylinders: number; // Total number of cylinders owned (Active + Full + Empty)
+  currentStock: number; // Full cylinders currently in storage (Ready to use)
+  cylindersPerBank: number; // Number of cylinders connected to the stove (Active)
 }
 
 export interface GasLog {

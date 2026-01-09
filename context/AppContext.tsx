@@ -24,8 +24,9 @@ const DEFAULT_CARD_VISIBILITY: ReportCardVisibilitySettings = {
 };
 
 const DEFAULT_GAS_CONFIG: GasConfig = {
+    totalCylinders: 6, // Default total
     currentStock: 0,
-    cylindersPerBank: 2, // Default to 2 cylinders connected
+    cylindersPerBank: 2, 
 };
 
 interface AppContextType {
@@ -113,7 +114,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 if (storedVisibility) setReportCardVisibility(storedVisibility);
 
                 const storedGasConfig = await db.getSetting('gasConfig');
-                if (storedGasConfig) setGasConfig(storedGasConfig);
+                if (storedGasConfig) {
+                    // Ensure totalCylinders exists for migrated data
+                    setGasConfig({ ...DEFAULT_GAS_CONFIG, ...storedGasConfig });
+                }
 
                 const storedGasLogs = await db.getGasLogs();
                 // Sort logs desc
@@ -308,7 +312,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const handleLogGasSwap = async (count: number) => {
         const newStock = gasConfig.currentStock - count;
-        // Don't allow negative stock for UI cleanliness, though logic handles it
+        // Don't allow negative stock for UI cleanliness
         const finalStock = Math.max(0, newStock);
         
         const newConfig = { ...gasConfig, currentStock: finalStock };
