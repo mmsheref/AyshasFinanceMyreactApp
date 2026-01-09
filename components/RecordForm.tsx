@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DailyRecord } from '../types';
 import { generateNewRecordExpenses } from '../constants';
 import { useAppContext } from '../context/AppContext';
+import { safeFloat } from '../utils/record-utils';
 import ImageUpload from './ImageUpload';
 import Modal from './Modal';
 import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon, SearchIcon, ChevronRightIcon } from './Icons';
@@ -134,44 +135,44 @@ const RecordForm: React.FC = () => {
 
   const totalExpenses = useMemo(() => {
     if (!formData) return 0;
-    return formData.expenses.reduce((total, category) => 
+    const total = formData.expenses.reduce((total, category) => 
         total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 
     0);
+    return safeFloat(total);
   }, [formData?.expenses]);
   
   const profit = useMemo(() => {
     if (!formData) return 0;
     if (formData.isClosed) return -totalExpenses; 
-    return (formData.totalSales || 0) - totalExpenses;
+    return safeFloat((formData.totalSales || 0) - totalExpenses);
   }, [formData?.totalSales, totalExpenses, formData?.isClosed]);
 
   const nightSales = useMemo(() => {
     if (!formData) return 0;
-    return (formData.totalSales || 0) - (formData.morningSales || 0);
+    return safeFloat((formData.totalSales || 0) - (formData.morningSales || 0));
   }, [formData?.totalSales, formData?.morningSales]);
 
-  const filteredExpenses = useMemo(() => {
+  // Simplified this memo to prevent creating new object references constantly
+  // We just return indices now, mapping handled in render
+  const filteredIndices = useMemo(() => {
     if (!formData) return [];
     
-    const mappedExpenses = formData.expenses.map((category, catIndex) => ({
-      ...category,
-      originalIndex: catIndex,
-      items: category.items.map((item, itemIndex) => ({
-        ...item,
-        originalIndex: itemIndex
-      }))
-    }));
-
     const trimmedSearch = expenseSearchTerm.trim().toLowerCase();
-    if (!trimmedSearch) return mappedExpenses;
+    
+    return formData.expenses.map((category, catIndex) => {
+        if (!trimmedSearch) {
+            return { catIndex, itemIndices: category.items.map((_, i) => i) };
+        }
+        
+        const matchingItemIndices = category.items
+            .map((item, index) => ({ item, index }))
+            .filter(({ item }) => item.name.toLowerCase().includes(trimmedSearch))
+            .map(({ index }) => index);
+            
+        return { catIndex, itemIndices: matchingItemIndices };
+    }).filter(group => group.itemIndices.length > 0);
 
-    return mappedExpenses
-      .map(category => ({
-        ...category,
-        items: category.items.filter(item => item.name.toLowerCase().includes(trimmedSearch))
-      }))
-      .filter(category => category.items.length > 0);
-  }, [formData, expenseSearchTerm]);
+  }, [formData?.expenses, expenseSearchTerm]); // Only depend on expenses structure/values and search
 
   if (!formData) return null; 
 
@@ -211,7 +212,16 @@ const RecordForm: React.FC = () => {
     let val = parseFloat(valueStr);
     if (isNaN(val)) val = 0;
     
-    newExpenses[catIndex].items[itemIndex].amount = val;
+    // Ensure mutation actually happens on new reference
+    newExpenses[catIndex] = {
+        ...newExpenses[catIndex],
+        items: [...newExpenses[catIndex].items]
+    };
+    newExpenses[catIndex].items[itemIndex] = {
+        ...newExpenses[catIndex].items[itemIndex],
+        amount: val
+    };
+
     setFormData({ ...formData, expenses: newExpenses });
   };
   
@@ -286,13 +296,9 @@ const RecordForm: React.FC = () => {
           const element = categoryRefs.current[categoryName];
           if (!element) return;
 
-          // Calculate where the element should be.
-          // App Header is 64px.
-          // Sticky Search Header is approx 110px.
-          // We want the category header to sit just below the sticky search header.
           const stickyOffset = (stickyHeaderRef.current?.offsetHeight || 110) + 64; 
           const elementPosition = element.getBoundingClientRect().top;
-          const offsetPosition = elementPosition + window.scrollY - stickyOffset - 10; // 10px buffer
+          const offsetPosition = elementPosition + window.scrollY - stickyOffset - 10;
 
           window.scrollTo({
               top: offsetPosition,
@@ -393,10 +399,9 @@ const RecordForm: React.FC = () => {
             </div>
         </div>
 
-        {filteredExpenses.map((category) => {
-          const catIndex = category.originalIndex;
-          const fullCategory = formData.expenses[catIndex];
-          const categoryTotal = fullCategory.items.reduce((sum, item) => sum + item.amount, 0);
+        {filteredIndices.map(({ catIndex, itemIndices }) => {
+          const category = formData.expenses[catIndex];
+          const categoryTotal = category.items.reduce((sum, item) => sum + (item.amount || 0), 0);
           const isOpen = isSearching || openCategory === category.name;
           
           return (
@@ -408,7 +413,7 @@ const RecordForm: React.FC = () => {
               <button type="button" onClick={() => toggleCategory(category.name)} className="w-full flex justify-between items-center p-4 text-left active:bg-surface-container-high dark:active:bg-surface-dark-container-high" aria-expanded={isOpen} disabled={isSearching}>
                 <div className="flex flex-col">
                   <span className={`text-base font-medium ${isOpen ? 'text-primary dark:text-primary-dark' : 'text-surface-on dark:text-surface-on-dark'}`}>{category.name}</span>
-                  <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-0.5">₹{categoryTotal.toLocaleString('en-IN')}</span>
+                  <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-0.5">₹{safeFloat(categoryTotal).toLocaleString('en-IN')}</span>
                 </div>
                 <ChevronDownIcon className={`w-6 h-6 text-surface-on-variant dark:text-surface-on-variant-dark transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -419,8 +424,8 @@ const RecordForm: React.FC = () => {
                     
                     {/* SCROLLABLE ITEM LIST */}
                     <div className="space-y-0">
-                        {category.items.map((item) => {
-                        const itemIndex = item.originalIndex;
+                        {itemIndices.map((itemIndex) => {
+                        const item = category.items[itemIndex];
                         return (
                         <div key={item.id} className="group flex items-center gap-3 py-3 border-b border-surface-outline/5 dark:border-surface-outline-dark/5 last:border-0">
                             
@@ -492,7 +497,7 @@ const RecordForm: React.FC = () => {
           )
         })}
 
-        {isSearching && filteredExpenses.length === 0 && (
+        {isSearching && filteredIndices.length === 0 && (
           <div className="p-6 text-center text-surface-on-variant dark:text-surface-on-variant-dark">
             No matches found for "{expenseSearchTerm}"
           </div>

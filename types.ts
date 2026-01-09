@@ -36,10 +36,14 @@ export interface GasConfig {
   cylindersPerBank: number; // Number of cylinders connected to the stove (Active)
 }
 
+export type GasLogType = 'USAGE' | 'REFILL';
+
 export interface GasLog {
   id: string;
   date: string;
-  cylindersSwapped: number; // How many were replaced (usually equals cylindersPerBank)
+  type: GasLogType;
+  count: number;
+  cylindersSwapped?: number; // Legacy field, optional now
 }
 
 export interface BackupData {

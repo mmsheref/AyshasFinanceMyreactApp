@@ -120,8 +120,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
 
                 const storedGasLogs = await db.getGasLogs();
-                // Sort logs desc
-                setGasLogs(storedGasLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                // Normalize legacy logs (missing type/count)
+                const normalizedLogs = storedGasLogs.map(log => ({
+                    ...log,
+                    type: log.type || 'USAGE', // Default old logs to Usage
+                    count: log.count !== undefined ? log.count : (log.cylindersSwapped || 0)
+                }));
+                
+                setGasLogs(normalizedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
             } catch (error) {
                 console.error("Failed to load data:", error);
@@ -151,29 +157,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const activeYearRecords = useMemo(() => {
         if (activeYear === 'all') return records;
         
-        // Fiscal Year Logic (April to March)
-        // e.g., '2023-2024' includes April 2023 to March 2024
-        const [startYearStr, endYearStr] = activeYear.split('-');
-        const startYear = parseInt(startYearStr);
-        const endYear = parseInt(endYearStr);
-        
-        const startDate = `${startYear}-04-01`;
-        const endDate = `${endYear}-03-31`;
-
-        return records.filter(r => r.date >= startDate && r.date <= endDate);
+        // Calendar Year Logic (Jan 1 to Dec 31)
+        // Date format YYYY-MM-DD starts with YYYY
+        return records.filter(r => r.date.startsWith(activeYear));
     }, [records, activeYear]);
 
     const availableYears = useMemo(() => {
         if (records.length === 0) return [];
         const years = new Set<string>();
         records.forEach(r => {
-            const date = new Date(r.date);
-            const month = date.getMonth(); // 0-11
-            const year = date.getFullYear();
-            // If month is Jan-Mar (0-2), it belongs to previous fiscal year started in (year-1)
-            // If month is Apr-Dec (3-11), it belongs to fiscal year started in (year)
-            const fiscalStartYear = month < 3 ? year - 1 : year;
-            years.add(`${fiscalStartYear}-${fiscalStartYear + 1}`);
+            // Extract YYYY from YYYY-MM-DD
+            const year = r.date.substring(0, 4);
+            years.add(year);
         });
         return Array.from(years).sort().reverse();
     }, [records]);
@@ -188,9 +183,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     // Gas Stats Calculation
     const gasStats = useMemo(() => {
-        if (gasLogs.length === 0) return { avgDailyUsage: 0, daysSinceLastSwap: -1 };
+        // Only count 'USAGE' logs for consumption stats
+        const usageLogs = gasLogs.filter(l => l.type === 'USAGE');
+        
+        if (usageLogs.length === 0) return { avgDailyUsage: 0, daysSinceLastSwap: -1 };
 
-        const lastSwap = new Date(gasLogs[0].date);
+        const lastSwap = new Date(usageLogs[0].date);
         const today = new Date();
         const diffTime = Math.abs(today.getTime() - lastSwap.getTime());
         const daysSinceLastSwap = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
@@ -200,13 +198,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         
-        const recentLogs = gasLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
+        const recentLogs = usageLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
         
         let avgDailyUsage = 0;
         if (recentLogs.length > 0) {
-            const totalSwapped = recentLogs.reduce((sum, l) => sum + l.cylindersSwapped, 0);
+            const totalSwapped = recentLogs.reduce((sum, l) => sum + l.count, 0);
             
             // Time window is from first recent log to today
+            // FIX: Ensure timeSpan is at least 1 day to avoid division by zero
             const firstRecentLogDate = new Date(recentLogs[recentLogs.length - 1].date);
             const timeSpan = Math.max(1, Math.floor((today.getTime() - firstRecentLogDate.getTime()) / (1000 * 60 * 60 * 24)));
             
@@ -255,8 +254,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Load Optional Legacy Data
         if (data.gasLogs) {
             await db.clearGasLogs();
-            await db.bulkAddGasLogs(data.gasLogs);
-            setGasLogs(data.gasLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            const normalizedLogs = data.gasLogs.map(log => ({
+                ...log,
+                type: log.type || 'USAGE', 
+                count: log.count !== undefined ? log.count : (log.cylindersSwapped || 0)
+            }));
+            await db.bulkAddGasLogs(normalizedLogs);
+            setGasLogs(normalizedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         }
         if (data.gasConfig) {
             await db.saveSetting('gasConfig', data.gasConfig);
@@ -311,17 +315,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const handleLogGasSwap = async (count: number) => {
-        const newStock = gasConfig.currentStock - count;
-        // Don't allow negative stock for UI cleanliness
-        const finalStock = Math.max(0, newStock);
+        // FIX: Prevent negative stock
+        const newStock = Math.max(0, gasConfig.currentStock - count);
         
-        const newConfig = { ...gasConfig, currentStock: finalStock };
+        const newConfig = { ...gasConfig, currentStock: newStock };
         await handleUpdateGasConfig(newConfig);
 
         const newLog: GasLog = {
             id: uuidv4(),
             date: new Date().toISOString(),
-            cylindersSwapped: count
+            type: 'USAGE',
+            count: count
         };
         await db.saveGasLog(newLog);
         setGasLogs(prev => [newLog, ...prev]);
@@ -331,6 +335,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const newStock = gasConfig.currentStock + count;
         const newConfig = { ...gasConfig, currentStock: newStock };
         await handleUpdateGasConfig(newConfig);
+
+        const newLog: GasLog = {
+            id: uuidv4(),
+            date: new Date().toISOString(),
+            type: 'REFILL',
+            count: count
+        };
+        await db.saveGasLog(newLog);
+        setGasLogs(prev => [newLog, ...prev]);
     };
 
     return (

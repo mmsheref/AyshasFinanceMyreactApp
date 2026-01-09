@@ -2,6 +2,13 @@
 import { DailyRecord, BackupData } from '../types';
 
 /**
+ * rounds a number to 2 decimal places to avoid floating point errors (e.g. 0.1 + 0.2 = 0.300000004)
+ */
+export const safeFloat = (num: number): number => {
+    return Math.round((num + Number.EPSILON) * 100) / 100;
+};
+
+/**
  * Calculates the total expenses for a given daily record.
  * @param record The daily record to calculate expenses for.
  * @returns The sum of all expense item amounts in the record.
@@ -10,9 +17,10 @@ export const calculateTotalExpenses = (record: DailyRecord): number => {
     if (!record || !record.expenses) {
         return 0;
     }
-    return record.expenses.reduce((total, category) => 
+    const total = record.expenses.reduce((total, category) => 
         total + category.items.reduce((catTotal, item) => catTotal + (item.amount || 0), 0), 
     0);
+    return safeFloat(total);
 };
 
 /**
@@ -27,12 +35,19 @@ export const getTodayDateString = (): string => {
 };
 
 /**
+ * Safely parses a YYYY-MM-DD string into a Date object at 00:00:00 local time.
+ */
+export const parseLocalDate = (dateStr: string): Date => {
+    return new Date(dateStr + 'T00:00:00');
+}
+
+/**
  * Returns a date string (YYYY-MM-DD) calculated by subtracting 'days' from 'refDate'.
  * @param refDateStr The reference date string (YYYY-MM-DD).
  * @param days The number of days to subtract.
  */
 export const subtractDays = (refDateStr: string, days: number): string => {
-    const date = new Date(refDateStr + 'T00:00:00');
+    const date = parseLocalDate(refDateStr);
     date.setDate(date.getDate() - days);
     
     // Convert back to YYYY-MM-DD safely
@@ -47,17 +62,11 @@ export const subtractDays = (refDateStr: string, days: number): string => {
  */
 export const getThisWeekRange = (): { start: string, end: string } => {
     const todayStr = getTodayDateString();
-    const today = new Date(todayStr + 'T00:00:00');
+    const today = parseLocalDate(todayStr);
     const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
     
     // Convert to Monday start:
     // JS getDay(): Sun=0, Mon=1, Tue=2, ... Sat=6
-    // We want days to subtract:
-    // If Mon(1) -> subtract 0
-    // If Tue(2) -> subtract 1
-    // ...
-    // If Sun(0) -> subtract 6
-    
     const daysFromMonday = (dayOfWeek + 6) % 7;
     
     const startStr = subtractDays(todayStr, daysFromMonday);
@@ -137,7 +146,6 @@ export const isBackupOlderThanCurrent = (currentRecords: DailyRecord[], backupDa
     if (backupData.records.length === 0) return false;
 
     // Sort to find latest dates (Desc)
-    // Note: Assuming dates are YYYY-MM-DD, string comparison works.
     const getLatestDate = (list: DailyRecord[]) => list.reduce((max, r) => r.date > max ? r.date : max, list[0].date);
 
     const appLatestDate = getLatestDate(currentRecords);

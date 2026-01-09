@@ -1,7 +1,8 @@
 {
   "name": "ayshas-pnl-tracker",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
+  "author": "Ameer",
   "type": "module",
   "scripts": {
     "dev": "vite",

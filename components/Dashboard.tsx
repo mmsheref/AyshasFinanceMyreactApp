@@ -5,8 +5,9 @@ import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
 import { useAppContext } from '../context/AppContext';
 import { calculateTotalExpenses, getTodayDateString, subtractDays, getThisWeekRange, getThisMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
-import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon, FireIcon } from './Icons';
+import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon, FireIcon, ListIcon } from './Icons';
 import Modal from './Modal';
+import GasHistoryModal from './GasHistoryModal';
 
 type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
@@ -22,6 +23,7 @@ const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean,
 const GasTrackerCard: React.FC = () => {
     const { gasConfig, gasStats, handleLogGasSwap, handleGasRefill } = useAppContext();
     const [isActionModalOpen, setActionModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [swapCount, setSwapCount] = useState<number>(1);
     const [refillCount, setRefillCount] = useState<number>(gasConfig.cylindersPerBank || 2);
 
@@ -79,7 +81,15 @@ const GasTrackerCard: React.FC = () => {
             {isActionModalOpen && (
                 <Modal onClose={() => setActionModalOpen(false)} size="alert">
                     <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
-                        <h3 className="text-lg font-bold mb-6 text-center text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
+                            <button 
+                                onClick={() => { setActionModalOpen(false); setIsHistoryModalOpen(true); }} 
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-highest dark:bg-surface-dark-container-highest text-xs font-bold text-primary dark:text-primary-dark"
+                            >
+                                <ListIcon className="w-3.5 h-3.5" /> History
+                            </button>
+                        </div>
                         
                         <div className="space-y-6">
                             {/* CONNECT ACTION (Was Kitchen) */}
@@ -139,6 +149,10 @@ const GasTrackerCard: React.FC = () => {
                         </div>
                     </div>
                 </Modal>
+            )}
+
+            {isHistoryModalOpen && (
+                <GasHistoryModal onClose={() => setIsHistoryModalOpen(false)} />
             )}
         </>
     );
@@ -359,7 +373,7 @@ const Dashboard: React.FC = () => {
             <div>
                 <h1 className="text-3xl font-normal text-surface-on dark:text-surface-on-dark">Overview</h1>
                 <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">
-                    {activeYear === 'all' ? 'Business Dashboard' : `Fiscal Year ${activeYear}`}
+                    {activeYear === 'all' ? 'Business Dashboard' : `Year ${activeYear}`}
                 </p>
             </div>
         </div>
