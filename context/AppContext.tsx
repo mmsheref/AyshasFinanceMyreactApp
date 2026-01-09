@@ -30,6 +30,7 @@ interface AppContextType {
     customStructure: CustomExpenseStructure;
     foodCostCategories: string[];
     billUploadCategories: string[];
+    trackedItems: string[];
     reportCardVisibility: ReportCardVisibilitySettings;
     activeYear: string; // 'all' or 'YYYY'
     availableYears: string[];
@@ -45,6 +46,7 @@ interface AppContextType {
     handleSaveCustomItem: (categoryName: string, itemName: string, defaultValue: number) => Promise<void>;
     handleUpdateFoodCostCategories: (newCategories: string[]) => Promise<void>;
     handleUpdateBillUploadCategories: (newCategories: string[]) => Promise<void>;
+    handleUpdateTrackedItems: (newItems: string[]) => Promise<void>;
     handleUpdateReportCardVisibility: (newVisibility: ReportCardVisibilitySettings) => Promise<void>;
 }
 
@@ -55,6 +57,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [customStructure, setCustomStructure] = useState<CustomExpenseStructure>({});
     const [foodCostCategories, setFoodCostCategories] = useState<string[]>([]);
     const [billUploadCategories, setBillUploadCategories] = useState<string[]>([]);
+    const [trackedItems, setTrackedItems] = useState<string[]>([]);
     const [reportCardVisibility, setReportCardVisibility] = useState<ReportCardVisibilitySettings>(DEFAULT_CARD_VISIBILITY);
     const [activeYear, setActiveYearInternal] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
@@ -105,6 +108,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const dbBillUploadCats = await db.getSetting('billUploadCategories');
                 if (dbBillUploadCats) setBillUploadCategories(dbBillUploadCats);
                 else setBillUploadCategories(CATEGORIES_WITH_BILL_UPLOAD);
+                
+                const dbTrackedItems = await db.getSetting('trackedItems');
+                if (dbTrackedItems) setTrackedItems(dbTrackedItems);
 
                 const dbCardVisibility = await db.getSetting('reportCardVisibility');
                 if (dbCardVisibility) setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
@@ -207,6 +213,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setBillUploadCategories(newCategories);
     };
 
+    const handleUpdateTrackedItems = async (newItems: string[]) => {
+        await db.saveSetting('trackedItems', newItems);
+        setTrackedItems(newItems);
+    }
+
     const handleUpdateReportCardVisibility = async (newVisibility: ReportCardVisibilitySettings) => {
         await db.saveSetting('reportCardVisibility', newVisibility);
         setReportCardVisibility(newVisibility);
@@ -219,6 +230,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         customStructure,
         foodCostCategories,
         billUploadCategories,
+        trackedItems,
         reportCardVisibility,
         activeYear,
         availableYears,
@@ -234,6 +246,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         handleSaveCustomItem,
         handleUpdateFoodCostCategories,
         handleUpdateBillUploadCategories,
+        handleUpdateTrackedItems,
         handleUpdateReportCardVisibility,
     };
 

@@ -5,7 +5,7 @@ import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
 import { useAppContext } from '../context/AppContext';
 import { calculateTotalExpenses, getTodayDateString, subtractDays, getThisWeekRange, getThisMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
-import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon } from './Icons';
+import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon } from './Icons';
 
 type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
@@ -19,18 +19,45 @@ const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean,
 );
 
 const Dashboard: React.FC = () => {
-  const { sortedRecords: records, activeYear } = useAppContext();
+  const { sortedRecords: records, allSortedRecords, activeYear, trackedItems } = useAppContext();
   const navigate = useNavigate();
   const [chartFilter, setChartFilter] = useState<ChartFilter>('WEEK');
 
   // 1. Get Dates
   const todayStr = getTodayDateString();
-  const yesterdayStr = subtractDays(todayStr, 1);
 
-  // 2. Find Specific Records
-  const yesterdayRecord = useMemo(() => 
-    records.find(r => r.date === yesterdayStr), 
-  [records, yesterdayStr]);
+  // 2. Prepare Pulse Data (Most Recent Record)
+  const pulseStats = useMemo(() => {
+    // Always fall back to the most recent record available
+    const displayRecord = records[0];
+    
+    if (!displayRecord) return null;
+
+    const expenses = calculateTotalExpenses(displayRecord);
+    const isToday = displayRecord.date === todayStr;
+    const isYesterday = displayRecord.date === subtractDays(todayStr, 1);
+
+    let label = '';
+    if (isToday) {
+        label = 'Today (Live)';
+    } else if (isYesterday) {
+        label = 'Yesterday';
+    } else {
+        // Show weekday name for older records
+        label = new Date(displayRecord.date).toLocaleDateString('en-GB', { weekday: 'long' });
+    }
+
+    return {
+        id: displayRecord.id, // Needed for navigation
+        date: displayRecord.date,
+        label,
+        isToday,
+        sales: displayRecord.totalSales,
+        expenses: expenses,
+        profit: displayRecord.totalSales - expenses,
+        isClosed: displayRecord.isClosed
+    };
+  }, [records, todayStr]);
 
   // 3. Calculate "This Week's" Stats (Monday -> Today)
   const thisWeekStats = useMemo(() => {
@@ -45,6 +72,12 @@ const Dashboard: React.FC = () => {
 
     records.forEach(r => {
         if (r.date >= startOfWeek && r.date <= todayStr) {
+            // Don't track in-progress record for weekly net profit
+            // In-progress = Not Closed AND Total Sales is 0
+            if (!r.isClosed && r.totalSales === 0) {
+                return;
+            }
+
             totalSales += r.totalSales;
             totalExpenses += calculateTotalExpenses(r);
             recordCount++;
@@ -85,33 +118,19 @@ const Dashboard: React.FC = () => {
     };
   }, [records, todayStr]);
 
-  // 4. Prepare Yesterday's Data
-  const yesterdayStats = useMemo(() => {
-    if (!yesterdayRecord) return null;
-    const expenses = calculateTotalExpenses(yesterdayRecord);
-    return {
-        sales: yesterdayRecord.totalSales,
-        expenses: expenses,
-        profit: yesterdayRecord.totalSales - expenses,
-        hasRecord: true,
-        isClosed: yesterdayRecord.isClosed
-    };
-  }, [yesterdayRecord]);
-
-  // 5. Chart Data (Dynamic based on filter)
+  // 4. Chart Data (Dynamic based on filter)
   const chartData = useMemo(() => {
-    let filteredRecords = records;
+    const validRecords = records.filter(r => r.isClosed || r.totalSales > 0);
+    let filteredRecords = validRecords;
     
     if (chartFilter === 'WEEK') {
         const { start } = getThisWeekRange();
-        filteredRecords = records.filter(r => r.date >= start);
+        filteredRecords = validRecords.filter(r => r.date >= start);
     } else if (chartFilter === 'MONTH') {
         const { start } = getThisMonthRange();
-        filteredRecords = records.filter(r => r.date >= start);
+        filteredRecords = validRecords.filter(r => r.date >= start);
     } 
-    // 'YEAR' uses all records (already filtered by activeYear in context)
-
-    // Sort oldest to newest for the graph
+    
     return [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date)).map(r => {
         const totalExpenses = calculateTotalExpenses(r);
         return {
@@ -124,13 +143,15 @@ const Dashboard: React.FC = () => {
   }, [records, chartFilter]);
 
   const salesChartData = useMemo(() => {
-    let filteredRecords = records;
+    const validRecords = records.filter(r => r.isClosed || r.totalSales > 0);
+    let filteredRecords = validRecords;
+
     if (chartFilter === 'WEEK') {
         const { start } = getThisWeekRange();
-        filteredRecords = records.filter(r => r.date >= start);
+        filteredRecords = validRecords.filter(r => r.date >= start);
     } else if (chartFilter === 'MONTH') {
         const { start } = getThisMonthRange();
-        filteredRecords = records.filter(r => r.date >= start);
+        filteredRecords = validRecords.filter(r => r.date >= start);
     }
 
     return [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date)).map(r => {
@@ -142,6 +163,45 @@ const Dashboard: React.FC = () => {
         };
     });
   }, [records, chartFilter]);
+
+  // 5. Tracked Items Data
+  const trackedItemsData = useMemo(() => {
+    if (!trackedItems || trackedItems.length === 0) return [];
+    
+    return trackedItems.map(itemName => {
+        const latestRecord = allSortedRecords.find(record => {
+            return record.expenses.some(cat => 
+                cat.items.some(item => item.name === itemName && item.amount > 0)
+            );
+        });
+
+        if (!latestRecord) return { name: itemName, daysAgo: null, date: null, amount: 0 };
+
+        const purchaseDate = new Date(latestRecord.date + 'T00:00:00');
+        const today = new Date(todayStr + 'T00:00:00');
+        const diffTime = Math.abs(today.getTime() - purchaseDate.getTime());
+        const daysAgo = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+        let amount = 0;
+        latestRecord.expenses.forEach(cat => {
+            const item = cat.items.find(i => i.name === itemName);
+            if (item) amount = item.amount;
+        });
+
+        return {
+            name: itemName,
+            daysAgo,
+            date: latestRecord.date,
+            amount
+        };
+    }).sort((a, b) => {
+        if (a.daysAgo === null && b.daysAgo === null) return 0;
+        if (a.daysAgo === null) return 1;
+        if (b.daysAgo === null) return -1;
+        return a.daysAgo - b.daysAgo;
+    });
+
+  }, [trackedItems, allSortedRecords, todayStr]);
 
 
   // --- EMPTY STATE ---
@@ -178,60 +238,93 @@ const Dashboard: React.FC = () => {
             </div>
         </div>
 
-        {/* SECTION 1: THE PULSE (YESTERDAY) */}
-        {yesterdayStats ? (
-            <div className="bg-surface-container-high dark:bg-surface-dark-container-high rounded-[24px] p-5 shadow-sm border border-surface-outline/10 dark:border-surface-outline-dark/10">
-                <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-primary/10 dark:bg-primary-dark/10 p-1.5 rounded-lg">
-                            <CalendarIcon className="w-5 h-5 text-primary dark:text-primary-dark"/>
+        {/* SECTION 0: INVENTORY WATCH */}
+        {trackedItemsData.length > 0 && (
+            <div>
+                 <div className="flex items-center gap-2 mb-3 px-1">
+                    <ClockIcon className="w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark"/>
+                    <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">Inventory Watch</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {trackedItemsData.map((item) => (
+                        <div key={item.name} className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] flex flex-col justify-between">
+                            <p className="text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark truncate mb-2">{item.name}</p>
+                            {item.daysAgo !== null ? (
+                                <div>
+                                    <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark leading-none mb-1">
+                                        {item.daysAgo === 0 ? 'Today' : (item.daysAgo === 1 ? 'Yesterday' : `${item.daysAgo} Days`)}
+                                    </p>
+                                    <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">
+                                        {new Date(item.date!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} • ₹{item.amount.toLocaleString('en-IN')}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 italic">Not purchased yet</p>
+                            )}
                         </div>
-                        <h2 className="text-base font-bold text-surface-on dark:text-surface-on-dark">Yesterday</h2>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* SECTION 1: PULSE (LATEST RECORD) */}
+        {pulseStats && (
+            <div 
+                className="bg-surface-container-high dark:bg-surface-dark-container-high rounded-[24px] p-4 shadow-sm border border-surface-outline/10 dark:border-surface-outline-dark/10 active:scale-[0.99] transition-transform cursor-pointer"
+                onClick={() => navigate(`/records/${pulseStats.id}`)}
+            >
+                <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${pulseStats.isToday ? 'bg-primary/10 dark:bg-primary-dark/10' : 'bg-surface-variant/20'}`}>
+                            {pulseStats.isToday ? (
+                                <SparklesIcon className={`w-4 h-4 ${pulseStats.isToday ? 'text-primary dark:text-primary-dark' : 'text-surface-on-variant'}`}/>
+                            ) : (
+                                <CalendarIcon className="w-4 h-4 text-surface-on-variant dark:text-surface-on-variant-dark"/>
+                            )}
+                        </div>
+                        <h2 className="text-sm font-bold text-surface-on dark:text-surface-on-dark">
+                            {pulseStats.label}
+                        </h2>
                     </div>
-                    <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-highest dark:bg-surface-dark-container-highest px-2 py-1 rounded-md">
-                        {new Date(yesterdayStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    <span className="text-[10px] font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-highest dark:bg-surface-dark-container-highest px-2 py-0.5 rounded-md">
+                        {new Date(pulseStats.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </span>
                 </div>
                 
-                {yesterdayStats.isClosed ? (
-                    <div className="py-4 text-center">
-                        <span className="inline-block px-3 py-1 bg-surface-container-highest dark:bg-surface-dark-container-highest text-surface-on-variant dark:text-surface-on-variant-dark text-sm font-bold uppercase tracking-wider rounded-lg border border-surface-outline/20">Shop Closed</span>
-                        <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-2">Fixed Expenses: ₹{yesterdayStats.expenses.toLocaleString('en-IN')}</p>
+                {pulseStats.isClosed ? (
+                    <div className="py-2 text-center">
+                        <span className="inline-block px-2 py-0.5 bg-surface-container-highest dark:bg-surface-dark-container-highest text-surface-on-variant dark:text-surface-on-variant-dark text-xs font-bold uppercase tracking-wider rounded-lg border border-surface-outline/20">Shop Closed</span>
+                        <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark mt-1">Fixed Expenses: ₹{pulseStats.expenses.toLocaleString('en-IN')}</p>
                     </div>
                 ) : (
                     <>
                         {/* Big Profit Number */}
-                        <div className="mt-2 mb-4">
-                            <span className={`text-4xl font-bold tracking-tight ${yesterdayStats.profit >= 0 ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
-                                {yesterdayStats.profit >= 0 ? '+' : '-'}₹{Math.abs(yesterdayStats.profit).toLocaleString('en-IN')}
+                        <div className="mt-1 mb-2">
+                            <span className={`text-3xl font-bold tracking-tight ${pulseStats.profit >= 0 ? 'text-[#006C4C] dark:text-[#6DD58C]' : 'text-error dark:text-error-dark'}`}>
+                                {pulseStats.profit >= 0 ? '+' : ''}₹{Math.abs(pulseStats.profit).toLocaleString('en-IN')}
                             </span>
-                            <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">
-                                {yesterdayStats.profit < 0 ? "Loss likely due to expenses/refills." : "Net profit after expenses."}
+                            <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark mt-0.5">
+                                {pulseStats.profit < 0 ? "Loss (Expenses > Sales)" : "Net Profit"}
                             </p>
                         </div>
 
                         {/* Mini Breakdown */}
-                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
                             <div>
-                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Sales</p>
-                                <p className="font-semibold text-surface-on dark:text-surface-on-dark">₹{yesterdayStats.sales.toLocaleString('en-IN')}</p>
+                                <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Sales</p>
+                                <p className="text-sm font-semibold text-surface-on dark:text-surface-on-dark">₹{pulseStats.sales.toLocaleString('en-IN')}</p>
                             </div>
                             <div>
-                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Expenses</p>
-                                <p className="font-semibold text-error dark:text-error-dark">₹{yesterdayStats.expenses.toLocaleString('en-IN')}</p>
+                                <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Expenses</p>
+                                <p className="text-sm font-semibold text-error dark:text-error-dark">₹{pulseStats.expenses.toLocaleString('en-IN')}</p>
                             </div>
                         </div>
                     </>
                 )}
             </div>
-        ) : (
-             <div onClick={() => navigate('/records/new')} className="bg-surface-container dark:bg-surface-dark-container border-2 border-dashed border-surface-outline/20 dark:border-surface-outline-dark/20 rounded-[24px] p-6 text-center cursor-pointer active:scale-[0.98] transition-transform">
-                <p className="text-surface-on-variant dark:text-surface-on-variant-dark font-medium mb-2">No record for Yesterday</p>
-                <button className="text-sm font-bold text-primary dark:text-primary-dark">Tap to add record</button>
-            </div>
         )}
 
-        {/* SECTION 2: THIS WEEK'S PERFORMANCE (Replaces Last 7 Days) */}
+        {/* SECTION 2: THIS WEEK'S PERFORMANCE */}
         <div>
             <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
@@ -241,7 +334,7 @@ const Dashboard: React.FC = () => {
             </div>
             
             <div className="space-y-3">
-                {/* 1. Profit Card (Hero of this section) */}
+                {/* 1. Profit Card */}
                 <div className="bg-surface-container dark:bg-surface-dark-container p-5 rounded-[24px]">
                     <div className="flex justify-between items-start mb-1">
                         <span className="text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark">Weekly Net Profit</span>

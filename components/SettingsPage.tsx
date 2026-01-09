@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import BackupRestore from './BackupRestore';
 import { useAppContext } from '../context/AppContext';
 import ExpenseStructureManager from './ExpenseStructureManager';
-import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon, CalendarIcon } from './Icons';
+import TrackedItemsManager from './TrackedItemsManager';
+import { DatabaseIcon, PaintBrushIcon, InformationCircleIcon, ChevronRightIcon, XMarkIcon, CodeBracketIcon, TagIcon, AdjustmentsHorizontalIcon, SparklesIcon, CalendarIcon, ClockIcon } from './Icons';
 import Modal from './Modal';
 import { ReportMetric, ReportCardVisibilitySettings, CustomExpenseStructure } from '../types';
 import { METRIC_LABELS } from '../constants';
@@ -205,6 +206,7 @@ const SettingsPage: React.FC = () => {
     const [isStructureModalOpen, setStructureModalOpen] = useState(false);
     const [isFoodCostModalOpen, setFoodCostModalOpen] = useState(false);
     const [isReportCardModalOpen, setReportCardModalOpen] = useState(false);
+    const [isTrackedItemsModalOpen, setTrackedItemsModalOpen] = useState(false);
     const [isAboutModalOpen, setAboutModalOpen] = useState(false);
     const [isYearModalOpen, setYearModalOpen] = useState(false);
 
@@ -233,6 +235,7 @@ const SettingsPage: React.FC = () => {
             </SettingsGroup>
             
             <SettingsGroup title="Analytics Config">
+                 <SettingsItem icon={<ClockIcon className="w-5 h-5"/>} title="Inventory Watch" description="Select items to track last purchase" onClick={() => setTrackedItemsModalOpen(true)} />
                  <SettingsItem icon={<TagIcon className="w-5 h-5"/>} title="Food Cost Categories" description="Select categories for cost analysis" onClick={() => setFoodCostModalOpen(true)} />
                  <SettingsItem icon={<AdjustmentsHorizontalIcon className="w-5 h-5"/>} title="Report Cards" description="Toggle visibility of KPI cards" onClick={() => setReportCardModalOpen(true)} />
             </SettingsGroup>
@@ -264,6 +267,7 @@ const SettingsPage: React.FC = () => {
             {isYearModalOpen && <YearPicker onClose={() => setYearModalOpen(false)} />}
             {isFoodCostModalOpen && <FoodCostCategoryManager onClose={() => setFoodCostModalOpen(false)} />}
             {isReportCardModalOpen && <ReportCardManager onClose={() => setReportCardModalOpen(false)} />}
+            {isTrackedItemsModalOpen && <TrackedItemsManager onClose={() => setTrackedItemsModalOpen(false)} />}
             
             {isAboutModalOpen && (
                 <Modal onClose={() => setAboutModalOpen(false)}>

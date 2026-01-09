@@ -13,6 +13,33 @@ const calculateTotalExpenses = (record: DailyRecord) => {
     0);
 };
 
+// Colors hardcoded to match the App's Light Theme (Material 3)
+const COLORS = {
+    surface: '#FEF7FF',           
+    surfaceContainer: '#F3EDF7',  
+    surfaceContainerHigh: '#ECE6F0', 
+    onSurface: '#1D1B20',         
+    onSurfaceVariant: '#49454F',  
+    primary: '#6750A4',           
+    primaryContainer: '#EADDFF',  
+    onPrimaryContainer: '#21005D', 
+    error: '#B3261E',             
+    success: '#006C4C',           
+    outline: '#79747E',           
+};
+
+// Helper for card styling
+const cardStyle = {
+    backgroundColor: COLORS.surface,
+    borderRadius: '24px',
+    padding: '24px',
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    justifyContent: 'center',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+};
+
 const CategoryCard: React.FC<{ category: ExpenseCategory }> = ({ category }) => {
     const categoryTotal = category.items.reduce((sum, item) => sum + item.amount, 0);
     const itemsWithAmount = category.items.filter(item => item.amount > 0);
@@ -20,16 +47,39 @@ const CategoryCard: React.FC<{ category: ExpenseCategory }> = ({ category }) => 
     if (itemsWithAmount.length === 0) return null;
 
     return (
-        <div className="mb-4">
-            <h4 className="text-sm font-semibold text-slate-800 bg-slate-100 p-2 rounded-t-md flex justify-between">
-                <span className="pr-2">{category.name}</span>
+        <div style={{ 
+            marginBottom: '20px', 
+            borderRadius: '16px', 
+            overflow: 'hidden', 
+            border: `1px solid ${COLORS.outline}20`,
+            backgroundColor: 'white'
+        }}>
+            <h4 style={{ 
+                padding: '12px 16px', 
+                backgroundColor: `${COLORS.primary}15`, 
+                color: COLORS.primary,
+                fontWeight: 'bold',
+                fontSize: '14px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+            }}>
+                <span>{category.name}</span>
                 <span>₹{categoryTotal.toLocaleString('en-IN')}</span>
             </h4>
-            <ul className="border border-t-0 border-slate-200 rounded-b-md bg-white">
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {itemsWithAmount.map((item, index) => (
-                    <li key={item.id} className={`px-2 py-1 flex justify-between items-center text-xs ${index < itemsWithAmount.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                        <span className="text-slate-700 pr-2 break-words">{item.name}</span>
-                        <span className="font-medium text-slate-900 flex-shrink-0">₹{item.amount.toLocaleString('en-IN')}</span>
+                    <li key={item.id} style={{ 
+                        padding: '10px 16px', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        fontSize: '13px',
+                        borderBottom: index < itemsWithAmount.length - 1 ? `1px solid ${COLORS.outline}10` : 'none',
+                        color: COLORS.onSurface
+                    }}>
+                        <span>{item.name}</span>
+                        <span style={{ fontWeight: 600 }}>₹{item.amount.toLocaleString('en-IN')}</span>
                     </li>
                 ))}
             </ul>
@@ -46,50 +96,135 @@ const ShareableReport: React.FC<ShareableReportProps> = ({ record, id }) => {
   const categoriesWithExpenses = record.expenses.filter(category => 
     category.items.reduce((sum, item) => sum + item.amount, 0) > 0
   );
+
+  // Split categories into two columns for layout balance
+  const midPoint = Math.ceil(categoriesWithExpenses.length / 2);
+  const leftColumn = categoriesWithExpenses.slice(0, midPoint);
+  const rightColumn = categoriesWithExpenses.slice(midPoint);
   
-  // We use fixed Slate/Gray/White colors here to ensure the report always looks the same
-  // regardless of the app's current dark/light mode setting. html2canvas will capture
-  // this specifically styled container.
   return (
-    <div id={id} className="p-8 bg-white font-sans text-slate-900" style={{ width: '800px' }}>
-      <div className="text-center pb-6 mb-6 border-b-2 border-slate-100">
-        <h1 className="text-2xl font-bold text-indigo-700">Ayshas Finance Tracker Report</h1>
-        <p className="text-lg text-slate-500 mt-1">{new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    <div id={id} style={{ 
+        width: '800px', 
+        backgroundColor: COLORS.surfaceContainer, 
+        color: COLORS.onSurface, 
+        fontFamily: 'Roboto, sans-serif',
+        padding: '40px',
+        boxSizing: 'border-box'
+    }}>
+      
+      {/* Header Section */}
+      <div style={{ 
+          textAlign: 'center', 
+          paddingBottom: '24px', 
+          marginBottom: '32px', 
+          borderBottom: `1px solid ${COLORS.outline}30` 
+      }}>
+        <p style={{ 
+            fontSize: '12px', 
+            textTransform: 'uppercase', 
+            letterSpacing: '0.2em', 
+            fontWeight: 'bold', 
+            marginBottom: '8px', 
+            color: COLORS.onSurfaceVariant 
+        }}>Daily P&L Report</p>
+        <h1 style={{ 
+            fontSize: '32px', 
+            fontWeight: 'bold', 
+            color: COLORS.onSurface,
+            margin: 0
+        }}>
+            {new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </h1>
+        {record.isClosed && (
+             <span style={{ 
+                 display: 'inline-block', 
+                 marginTop: '12px', 
+                 padding: '4px 12px', 
+                 borderRadius: '999px', 
+                 fontSize: '12px', 
+                 fontWeight: 'bold', 
+                 textTransform: 'uppercase', 
+                 letterSpacing: '0.05em', 
+                 backgroundColor: COLORS.surfaceContainerHigh, 
+                 color: COLORS.onSurfaceVariant, 
+                 border: `1px solid ${COLORS.outline}40` 
+             }}>
+                 Shop Closed
+             </span>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-6 text-center mb-8">
-        <div className="bg-slate-50 p-4 rounded-xl flex flex-col justify-between border border-slate-100">
+      {/* KPI Cards Row (Flexbox) */}
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '32px' }}>
+        
+        {/* Sales Card */}
+        <div style={{ ...cardStyle, justifyContent: 'space-between' }}>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Sales</p>
-              <p className="text-2xl font-bold text-indigo-700">₹{record.totalSales.toLocaleString('en-IN')}</p>
+              <p style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', color: COLORS.onSurfaceVariant }}>Total Sales</p>
+              <p style={{ fontSize: '28px', fontWeight: 'bold', color: COLORS.primary, margin: 0 }}>₹{record.totalSales.toLocaleString('en-IN')}</p>
             </div>
-             <div className="text-[11px] space-y-0.5 text-left border-t border-slate-200 pt-2 mt-2">
-                <p className="flex justify-between"><span>Morning:</span> <span className="font-semibold text-slate-800">₹{morningSales.toLocaleString('en-IN')}</span></p>
-                <p className="flex justify-between"><span>Night:</span> <span className="font-semibold text-slate-800">₹{nightSales.toLocaleString('en-IN')}</span></p>
+             {!record.isClosed && (
+             <div style={{ fontSize: '11px', borderTop: `1px solid ${COLORS.outline}20`, paddingTop: '10px', marginTop: '10px', color: COLORS.onSurfaceVariant }}>
+                <p style={{ display: 'flex', justifyContent: 'space-between', margin: '0 0 4px 0' }}>
+                    <span>Morning:</span> <span style={{ fontWeight: 'bold', color: COLORS.onSurface }}>₹{morningSales.toLocaleString('en-IN')}</span>
+                </p>
+                <p style={{ display: 'flex', justifyContent: 'space-between', margin: 0 }}>
+                    <span>Night:</span> <span style={{ fontWeight: 'bold', color: COLORS.onSurface }}>₹{nightSales.toLocaleString('en-IN')}</span>
+                </p>
             </div>
+             )}
         </div>
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Expenses</p>
-          <p className="text-2xl font-bold text-rose-600">₹{totalExpenses.toLocaleString('en-IN')}</p>
+        
+        {/* Expenses Card */}
+        <div style={cardStyle}>
+          <p style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', color: COLORS.onSurfaceVariant }}>Total Expenses</p>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: COLORS.error, margin: 0 }}>₹{totalExpenses.toLocaleString('en-IN')}</p>
         </div>
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{profit >= 0 ? 'Profit' : 'Loss'}</p>
-          <p className={`text-2xl font-bold ${profit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>₹{Math.abs(profit).toLocaleString('en-IN')}</p>
+
+        {/* Profit Card */}
+        <div style={cardStyle}>
+          <p style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', color: COLORS.onSurfaceVariant }}>{profit >= 0 ? 'Net Profit' : 'Net Loss'}</p>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: profit >= 0 ? COLORS.success : COLORS.error, margin: 0 }}>
+            {profit >= 0 ? '+' : ''}₹{Math.abs(profit).toLocaleString('en-IN')}
+          </p>
         </div>
       </div>
 
+      {/* Breakdown Section */}
       <div>
-        <h3 className="text-center text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-6">Expense Breakdown</h3>
-        {/* Using standard Grid for layout consistency in html2canvas */}
-        <div className="grid grid-cols-2 gap-x-6 items-start">
-          {categoriesWithExpenses.map(category => (
-            <CategoryCard key={category.id} category={category} />
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: COLORS.onSurface, margin: 0, paddingRight: '10px' }}>Expense Breakdown</h3>
+            <div style={{ flexGrow: 1, height: '1px', backgroundColor: `${COLORS.outline}30` }}></div>
+        </div>
+        
+        {/* Two Column Layout using Flexbox */}
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+            {/* Left Column */}
+            <div style={{ flex: 1 }}>
+                {leftColumn.map(category => (
+                    <CategoryCard key={category.id} category={category} />
+                ))}
+            </div>
+            
+            {/* Right Column */}
+            <div style={{ flex: 1 }}>
+                {rightColumn.map(category => (
+                    <CategoryCard key={category.id} category={category} />
+                ))}
+            </div>
         </div>
       </div>
 
-       <div className="text-center mt-8 pt-4 border-t border-slate-100 text-[10px] text-slate-300">
-        <p>Generated by Ayshas Finance Tracker • All figures in INR (₹)</p>
+       <div style={{ 
+           textAlign: 'center', 
+           marginTop: '40px', 
+           paddingTop: '20px', 
+           borderTop: `1px solid ${COLORS.outline}30`, 
+           fontSize: '12px', 
+           fontWeight: 500, 
+           color: COLORS.onSurfaceVariant 
+       }}>
+        <p style={{ margin: 0 }}>Generated by Ayshas Finance Tracker</p>
       </div>
     </div>
   );
