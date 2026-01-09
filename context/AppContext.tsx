@@ -39,7 +39,7 @@ interface AppContextType {
     reportCardVisibility: ReportCardVisibilitySettings;
     gasConfig: GasConfig;
     gasLogs: GasLog[];
-    gasStats: { avgDaysPerCylinder: number; avgDailyUsage: number; daysSinceLastSwap: number };
+    gasStats: { avgDailyUsage: number; daysSinceLastSwap: number };
     activeYear: string; // 'all' or 'YYYY'
     availableYears: string[];
     isLoading: boolean;
@@ -57,7 +57,7 @@ interface AppContextType {
     handleUpdateTrackedItems: (newItems: string[]) => Promise<void>;
     handleUpdateReportCardVisibility: (newVisibility: ReportCardVisibilitySettings) => Promise<void>;
     handleUpdateGasConfig: (config: GasConfig) => Promise<void>;
-    handleLogGasSwap: () => Promise<void>;
+    handleLogGasSwap: (count: number) => Promise<void>;
     handleGasRefill: (count: number) => Promise<void>;
 }
 
@@ -81,211 +81,204 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             try {
                 await db.openDB();
 
-                const storedRecords = localStorage.getItem('ayshas-records');
-                const storedStructure = localStorage.getItem('ayshas-custom-structure');
-
-                if (storedRecords) {
-                    const parsedRecords: DailyRecord[] = JSON.parse(storedRecords);
-                    const { migratedRecords } = runMigration(parsedRecords);
-
-                    let finalStructure = DEFAULT_EXPENSE_STRUCTURE;
-                    if (storedStructure) {
-                        const parsedStructure = JSON.parse(storedStructure);
-                        finalStructure = migrateStructure(parsedStructure);
-                    }
-                    
+                const storedRecords = await db.getAllRecords();
+                // Run migrations
+                const { migratedRecords, needsUpdate } = runMigration(storedRecords);
+                if (needsUpdate) {
                     await db.bulkAddRecords(migratedRecords);
-                    await db.saveCustomStructure(finalStructure);
-                    setRecords(migratedRecords);
-                    setCustomStructure(finalStructure);
-                    localStorage.removeItem('ayshas-records');
-                    localStorage.removeItem('ayshas-custom-structure');
+                    console.log('Database migrated successfully');
+                }
+                setRecords(migratedRecords);
+
+                const storedStructure = await db.getCustomStructure();
+                if (storedStructure) {
+                    setCustomStructure(migrateStructure(storedStructure));
                 } else {
-                    const dbRecords = await db.getAllRecords();
-                    const dbStructure = await db.getCustomStructure();
-                    setRecords(dbRecords);
-                    if (dbStructure) {
-                        setCustomStructure(dbStructure);
-                    } else {
-                        const initialStructure = DEFAULT_EXPENSE_STRUCTURE;
-                        setCustomStructure(initialStructure);
-                        await db.saveCustomStructure(initialStructure);
-                    }
+                    setCustomStructure(DEFAULT_EXPENSE_STRUCTURE);
                 }
 
-                // Settings
-                const dbFoodCostCats = await db.getSetting('foodCostCategories');
-                if (dbFoodCostCats) setFoodCostCategories(dbFoodCostCats);
-                else setFoodCostCategories(['Market Bills', 'Meat']);
+                // Load Settings
+                const storedFoodCost = await db.getSetting('foodCostCategories');
+                if (storedFoodCost) setFoodCostCategories(storedFoodCost);
+                else setFoodCostCategories(['Market Bills', 'Meat', 'Diary Expenses', 'Gas']);
 
-                const dbBillUploadCats = await db.getSetting('billUploadCategories');
-                if (dbBillUploadCats) setBillUploadCategories(dbBillUploadCats);
+                const storedBillUpload = await db.getSetting('billUploadCategories');
+                if (storedBillUpload) setBillUploadCategories(storedBillUpload);
                 else setBillUploadCategories(CATEGORIES_WITH_BILL_UPLOAD);
-                
-                const dbTrackedItems = await db.getSetting('trackedItems');
-                if (dbTrackedItems) setTrackedItems(dbTrackedItems);
 
-                const dbCardVisibility = await db.getSetting('reportCardVisibility');
-                if (dbCardVisibility) setReportCardVisibility({ ...DEFAULT_CARD_VISIBILITY, ...dbCardVisibility });
-                
-                const dbGasConfig = await db.getSetting('gasConfig');
-                if (dbGasConfig) setGasConfig(dbGasConfig);
-                
-                const dbGasLogs = await db.getGasLogs();
-                setGasLogs(dbGasLogs || []);
+                const storedTrackedItems = await db.getSetting('trackedItems');
+                if (storedTrackedItems) setTrackedItems(storedTrackedItems);
 
-                const dbActiveYear = await db.getSetting('activeYear');
-                if (dbActiveYear) setActiveYearInternal(dbActiveYear);
+                const storedVisibility = await db.getSetting('reportCardVisibility');
+                if (storedVisibility) setReportCardVisibility(storedVisibility);
+
+                const storedGasConfig = await db.getSetting('gasConfig');
+                if (storedGasConfig) setGasConfig(storedGasConfig);
+
+                const storedGasLogs = await db.getGasLogs();
+                // Sort logs desc
+                setGasLogs(storedGasLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
             } catch (error) {
-                console.error("Failed to load data", error);
+                console.error("Failed to load data:", error);
             } finally {
                 setIsLoading(false);
             }
         };
-
         loadData();
     }, []);
-
+    
     useEffect(() => {
         const root = window.document.documentElement;
-        const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        root.classList.toggle('dark', isDark);
+        root.classList.remove('light', 'dark');
+        if (theme === 'system') {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.classList.add(systemTheme);
+        } else {
+            root.classList.add(theme);
+        }
         localStorage.setItem('theme', theme);
     }, [theme]);
 
-    const allSortedRecords = useMemo(() => 
-        [...records].sort((a, b) => b.date.localeCompare(a.date)),
-        [records]
-    );
+    const handleThemeChange = (newTheme: Theme) => {
+        setTheme(newTheme);
+    };
+
+    const activeYearRecords = useMemo(() => {
+        if (activeYear === 'all') return records;
+        
+        // Fiscal Year Logic (April to March)
+        // e.g., '2023-2024' includes April 2023 to March 2024
+        const [startYearStr, endYearStr] = activeYear.split('-');
+        const startYear = parseInt(startYearStr);
+        const endYear = parseInt(endYearStr);
+        
+        const startDate = `${startYear}-04-01`;
+        const endDate = `${endYear}-03-31`;
+
+        return records.filter(r => r.date >= startDate && r.date <= endDate);
+    }, [records, activeYear]);
 
     const availableYears = useMemo(() => {
+        if (records.length === 0) return [];
         const years = new Set<string>();
-        records.forEach(r => years.add(r.date.split('-')[0]));
-        return Array.from(years).sort((a, b) => b.localeCompare(a));
+        records.forEach(r => {
+            const date = new Date(r.date);
+            const month = date.getMonth(); // 0-11
+            const year = date.getFullYear();
+            // If month is Jan-Mar (0-2), it belongs to previous fiscal year started in (year-1)
+            // If month is Apr-Dec (3-11), it belongs to fiscal year started in (year)
+            const fiscalStartYear = month < 3 ? year - 1 : year;
+            years.add(`${fiscalStartYear}-${fiscalStartYear + 1}`);
+        });
+        return Array.from(years).sort().reverse();
     }, [records]);
 
     const sortedRecords = useMemo(() => {
-        const base = activeYear === 'all' 
-            ? records 
-            : records.filter(r => r.date.startsWith(activeYear));
-        return [...base].sort((a, b) => b.date.localeCompare(a.date));
-    }, [records, activeYear]);
+        return [...activeYearRecords].sort((a, b) => b.date.localeCompare(a.date));
+    }, [activeYearRecords]);
 
-    // --- Gas Calculations ---
-    const gasStats = useMemo(() => {
-        if (gasLogs.length < 2) {
-            // Need at least 2 logs to calculate usage interval
-            // Or 1 log + current date? Let's strictly calculate between known swaps for accuracy
-            
-            // Calculate Days since last swap
-            let daysSinceLastSwap = 0;
-            if (gasLogs.length === 1) {
-                 const lastLog = new Date(gasLogs[0].date);
-                 const today = new Date();
-                 const diffTime = Math.abs(today.getTime() - lastLog.getTime());
-                 daysSinceLastSwap = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            }
-
-            return { avgDaysPerCylinder: 0, avgDailyUsage: 0, daysSinceLastSwap };
-        }
-
-        const sortedLogs = [...gasLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        // Calculate total days between first and last log
-        const firstLog = new Date(sortedLogs[0].date);
-        const lastLog = new Date(sortedLogs[sortedLogs.length - 1].date);
-        
-        // Time span in days
-        const diffTime = Math.abs(lastLog.getTime() - firstLog.getTime());
-        const totalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
-        // Cylinders consumed (Excluding the very first setup log if we assume start-state, 
-        // but typically a log means "I finished X cylinders". 
-        // So we sum up cylindersSwapped from index 1 to end (the usage during the period).
-        // Actually, if I swap on Jan 1, and swap on Jan 5. 
-        // That means I used the cylinders from Jan 1 during those 4 days.
-        
-        // Sum cylinders swapped from index 1 to end
-        let totalCylindersUsed = 0;
-        for (let i = 1; i < sortedLogs.length; i++) {
-            totalCylindersUsed += sortedLogs[i].cylindersSwapped;
-        }
-        
-        if (totalCylindersUsed === 0) return { avgDaysPerCylinder: 0, avgDailyUsage: 0, daysSinceLastSwap: 0 };
-
-        const avgDaysPerCylinder = totalDays / totalCylindersUsed;
-        const avgDailyUsage = totalCylindersUsed / totalDays;
-        
-        // Days since last swap
-        const today = new Date();
-        const lastSwapTime = Math.abs(today.getTime() - lastLog.getTime());
-        const daysSinceLastSwap = Math.ceil(lastSwapTime / (1000 * 60 * 60 * 24));
-
-        return { avgDaysPerCylinder, avgDailyUsage, daysSinceLastSwap };
-
-    }, [gasLogs]);
+    const allSortedRecords = useMemo(() => {
+        return [...records].sort((a, b) => b.date.localeCompare(a.date));
+    }, [records]);
     
+    // Gas Stats Calculation
+    const gasStats = useMemo(() => {
+        if (gasLogs.length === 0) return { avgDailyUsage: 0, daysSinceLastSwap: -1 };
+
+        const lastSwap = new Date(gasLogs[0].date);
+        const today = new Date();
+        const diffTime = Math.abs(today.getTime() - lastSwap.getTime());
+        const daysSinceLastSwap = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+
+        // Calc Usage
+        // Look at last 60 days
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        
+        const recentLogs = gasLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
+        
+        let avgDailyUsage = 0;
+        if (recentLogs.length > 0) {
+            const totalSwapped = recentLogs.reduce((sum, l) => sum + l.cylindersSwapped, 0);
+            
+            // Time window is from first recent log to today
+            const firstRecentLogDate = new Date(recentLogs[recentLogs.length - 1].date);
+            const timeSpan = Math.max(1, Math.floor((today.getTime() - firstRecentLogDate.getTime()) / (1000 * 60 * 60 * 24)));
+            
+            avgDailyUsage = totalSwapped / timeSpan;
+        }
+
+        return { avgDailyUsage, daysSinceLastSwap };
+    }, [gasLogs]);
+
+
     const setActiveYear = async (year: string) => {
-        await db.saveSetting('activeYear', year);
         setActiveYearInternal(year);
     };
 
-    const getRecordById = (id: string) => records.find(r => r.id === id);
+    const getRecordById = (id: string) => {
+        return records.find(r => r.id === id);
+    };
+
+    const handleSave = async (record: DailyRecord, originalId?: string) => {
+        if (originalId && originalId !== record.id) {
+            await db.deleteRecord(originalId);
+            setRecords(prev => prev.filter(r => r.id !== originalId));
+        }
+
+        await db.saveRecord(record);
+        
+        setRecords(prev => {
+            const exists = prev.some(r => r.id === record.id);
+            if (exists) {
+                return prev.map(r => r.id === record.id ? record : r);
+            }
+            return [...prev, record];
+        });
+    };
 
     const handleDelete = async (id: string) => {
         await db.deleteRecord(id);
         setRecords(prev => prev.filter(r => r.id !== id));
     };
 
-    const handleSave = async (record: DailyRecord, originalId?: string) => {
-        const oldId = originalId || record.id;
-        if (record.id !== oldId && records.some(r => r.id === record.id)) {
-            throw new Error('A record for this date already exists.');
-        }
-        if (record.id !== oldId) await db.deleteRecord(oldId);
-        await db.saveRecord(record);
-        setRecords(prev => {
-            const others = prev.filter(r => r.id !== oldId);
-            return [...others, record];
-        });
-    };
-    
-    const handleSaveCustomItem = async (categoryName: string, itemName: string, defaultValue: number) => {
-        const newStructure = { ...customStructure };
-        if (newStructure[categoryName] && !newStructure[categoryName].some(item => item.name === itemName)) {
-            newStructure[categoryName] = [...newStructure[categoryName], { name: itemName, defaultValue }];
-            await db.saveCustomStructure(newStructure);
-            setCustomStructure(newStructure);
-        }
-    };
-    
     const handleRestore = async (data: BackupData): Promise<number> => {
-        const { migratedRecords } = runMigration(data.records);
-        const migratedStructure = migrateStructure(data.customStructure);
         await db.clearRecords();
-        await db.bulkAddRecords(migratedRecords);
-        await db.saveCustomStructure(migratedStructure);
-        
-        // Restore gas data if present
+        await db.bulkAddRecords(data.records);
+        await db.saveCustomStructure(data.customStructure);
+
+        // Load Optional Legacy Data
+        if (data.gasLogs) {
+            await db.clearGasLogs();
+            await db.bulkAddGasLogs(data.gasLogs);
+            setGasLogs(data.gasLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        }
         if (data.gasConfig) {
             await db.saveSetting('gasConfig', data.gasConfig);
             setGasConfig(data.gasConfig);
         }
-        if (data.gasLogs) {
-             await db.clearGasLogs();
-             await db.bulkAddGasLogs(data.gasLogs);
-             setGasLogs(data.gasLogs);
-        }
 
-        setRecords(migratedRecords);
-        setCustomStructure(migratedStructure);
+        setRecords(data.records);
+        setCustomStructure(data.customStructure);
         return data.records.length;
     };
 
     const handleUpdateStructure = async (newStructure: CustomExpenseStructure) => {
         await db.saveCustomStructure(newStructure);
         setCustomStructure(newStructure);
+    };
+
+    const handleSaveCustomItem = async (categoryName: string, itemName: string, defaultValue: number) => {
+        const newStructure = { ...customStructure };
+        if (!newStructure[categoryName]) {
+            newStructure[categoryName] = [];
+        }
+        // Avoid dupes
+        if (!newStructure[categoryName].some(i => i.name === itemName)) {
+             newStructure[categoryName] = [...newStructure[categoryName], { name: itemName, defaultValue }];
+             await handleUpdateStructure(newStructure);
+        }
     };
     
     const handleUpdateFoodCostCategories = async (newCategories: string[]) => {
@@ -301,83 +294,77 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const handleUpdateTrackedItems = async (newItems: string[]) => {
         await db.saveSetting('trackedItems', newItems);
         setTrackedItems(newItems);
-    }
+    };
 
     const handleUpdateReportCardVisibility = async (newVisibility: ReportCardVisibilitySettings) => {
         await db.saveSetting('reportCardVisibility', newVisibility);
         setReportCardVisibility(newVisibility);
     };
 
-    // --- Gas Actions ---
     const handleUpdateGasConfig = async (config: GasConfig) => {
         await db.saveSetting('gasConfig', config);
         setGasConfig(config);
     };
 
-    const handleLogGasSwap = async () => {
-        // 1. Create Log
+    const handleLogGasSwap = async (count: number) => {
+        const newStock = gasConfig.currentStock - count;
+        // Don't allow negative stock for UI cleanliness, though logic handles it
+        const finalStock = Math.max(0, newStock);
+        
+        const newConfig = { ...gasConfig, currentStock: finalStock };
+        await handleUpdateGasConfig(newConfig);
+
         const newLog: GasLog = {
             id: uuidv4(),
             date: new Date().toISOString(),
-            cylindersSwapped: gasConfig.cylindersPerBank
+            cylindersSwapped: count
         };
         await db.saveGasLog(newLog);
-        
-        // 2. Decrement Stock
-        const newStock = Math.max(0, gasConfig.currentStock - gasConfig.cylindersPerBank);
-        const newConfig = { ...gasConfig, currentStock: newStock };
-        await db.saveSetting('gasConfig', newConfig);
-
-        setGasLogs(prev => [...prev, newLog]);
-        setGasConfig(newConfig);
+        setGasLogs(prev => [newLog, ...prev]);
     };
 
     const handleGasRefill = async (count: number) => {
         const newStock = gasConfig.currentStock + count;
         const newConfig = { ...gasConfig, currentStock: newStock };
-        await db.saveSetting('gasConfig', newConfig);
-        setGasConfig(newConfig);
+        await handleUpdateGasConfig(newConfig);
     };
 
-
-    const value: AppContextType = {
-        records,
-        sortedRecords,
-        allSortedRecords,
-        customStructure,
-        foodCostCategories,
-        billUploadCategories,
-        trackedItems,
-        reportCardVisibility,
-        gasConfig,
-        gasLogs,
-        gasStats,
-        activeYear,
-        availableYears,
-        isLoading,
-        theme,
-        setTheme,
-        setActiveYear,
-        getRecordById,
-        handleSave,
-        handleDelete,
-        handleRestore,
-        handleUpdateStructure,
-        handleSaveCustomItem,
-        handleUpdateFoodCostCategories,
-        handleUpdateBillUploadCategories,
-        handleUpdateTrackedItems,
-        handleUpdateReportCardVisibility,
-        handleUpdateGasConfig,
-        handleLogGasSwap,
-        handleGasRefill,
-    };
-
-    return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+    return (
+        <AppContext.Provider value={{
+            records,
+            sortedRecords,
+            allSortedRecords,
+            customStructure,
+            foodCostCategories,
+            billUploadCategories,
+            trackedItems,
+            reportCardVisibility,
+            gasConfig,
+            gasLogs,
+            gasStats,
+            activeYear,
+            availableYears,
+            isLoading,
+            theme,
+            setTheme: handleThemeChange,
+            setActiveYear,
+            getRecordById,
+            handleSave,
+            handleDelete,
+            handleRestore,
+            handleUpdateStructure,
+            handleSaveCustomItem,
+            handleUpdateFoodCostCategories,
+            handleUpdateBillUploadCategories,
+            handleUpdateTrackedItems,
+            handleUpdateReportCardVisibility,
+            handleUpdateGasConfig,
+            handleLogGasSwap,
+            handleGasRefill
+        }}>
+            {children}
+        </AppContext.Provider>
+    );
 };
 
-export const useAppContext = () => {
-    const context = useContext(AppContext);
-    if (!context) throw new Error('useAppContext must be used within an AppProvider');
-    return context;
-};
+export const useAppContext = () => useContext(AppContext);

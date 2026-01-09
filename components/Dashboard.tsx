@@ -22,13 +22,12 @@ const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean,
 const GasTrackerCard: React.FC = () => {
     const { gasConfig, gasStats, handleLogGasSwap, handleGasRefill } = useAppContext();
     const [isActionModalOpen, setActionModalOpen] = useState(false);
-    const [refillCount, setRefillCount] = useState<number>(gasConfig.cylindersPerBank);
+    const [swapCount, setSwapCount] = useState<number>(1);
+    const [refillCount, setRefillCount] = useState<number>(gasConfig.cylindersPerBank || 2);
 
     const onSwapConfirm = async () => {
-        if (confirm(`Confirm that you have replaced ${gasConfig.cylindersPerBank} empty cylinders?`)) {
-            await handleLogGasSwap();
-            setActionModalOpen(false);
-        }
+        await handleLogGasSwap(swapCount);
+        setActionModalOpen(false);
     };
 
     const onRefillConfirm = async () => {
@@ -47,7 +46,7 @@ const GasTrackerCard: React.FC = () => {
                         <FireIcon className="w-5 h-5 text-tertiary dark:text-tertiary-dark" />
                         <h3 className="text-sm font-bold text-surface-on dark:text-surface-on-dark">Gas Tracker</h3>
                     </div>
-                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gasConfig.currentStock <= gasConfig.cylindersPerBank ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-primary/10 text-primary dark:text-primary-dark'}`}>
+                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gasConfig.currentStock <= 1 ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-primary/10 text-primary dark:text-primary-dark'}`}>
                         Stock: {gasConfig.currentStock}
                     </span>
                 </div>
@@ -61,7 +60,7 @@ const GasTrackerCard: React.FC = () => {
                     </div>
                      <div className="text-right">
                          <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Last Swap</p>
-                         <p className="text-xs font-medium text-surface-on dark:text-surface-on-dark">{gasStats.daysSinceLastSwap} days ago</p>
+                         <p className="text-xs font-medium text-surface-on dark:text-surface-on-dark">{gasStats.daysSinceLastSwap >= 0 ? `${gasStats.daysSinceLastSwap} days ago` : 'Never'}</p>
                     </div>
                 </div>
             </div>
@@ -69,19 +68,39 @@ const GasTrackerCard: React.FC = () => {
             {isActionModalOpen && (
                 <Modal onClose={() => setActionModalOpen(false)} size="alert">
                     <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
-                        <h3 className="text-lg font-bold mb-4 text-center text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
+                        <h3 className="text-lg font-bold mb-6 text-center text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
                         
-                        <div className="space-y-4">
-                            <button 
-                                onClick={onSwapConfirm}
-                                className="w-full p-4 bg-tertiary-container dark:bg-tertiary-container-dark text-tertiary-on-container dark:text-tertiary-on-container-dark rounded-xl text-left hover:opacity-90 transition-opacity"
-                            >
-                                <p className="font-bold text-base">Log Swap (Use Stock)</p>
-                                <p className="text-xs opacity-80 mt-1">
-                                    Empty cylinders replaced with {gasConfig.cylindersPerBank} full ones.
+                        <div className="space-y-6">
+                            {/* LOG SWAP SECTION */}
+                            <div className="bg-tertiary-container dark:bg-tertiary-container-dark p-4 rounded-xl text-tertiary-on-container dark:text-tertiary-on-container-dark">
+                                <p className="font-bold text-base mb-2">Log Swap (Use Stock)</p>
+                                <div className="flex items-center gap-3 mb-2">
+                                     <div className="flex items-center bg-white/40 dark:bg-black/20 rounded-lg overflow-hidden shrink-0">
+                                        <button 
+                                            onClick={() => setSwapCount(Math.max(1, swapCount - 1))} 
+                                            className="w-10 h-10 flex items-center justify-center font-bold hover:bg-white/20 active:bg-white/30 text-lg"
+                                        >-</button>
+                                        <div className="w-10 h-10 flex items-center justify-center font-bold text-lg border-x border-white/20">
+                                            {swapCount}
+                                        </div>
+                                        <button 
+                                            onClick={() => setSwapCount(swapCount + 1)} 
+                                            className="w-10 h-10 flex items-center justify-center font-bold hover:bg-white/20 active:bg-white/30 text-lg"
+                                        >+</button>
+                                    </div>
+                                    <button 
+                                        onClick={onSwapConfirm}
+                                        className="flex-grow h-10 bg-tertiary-on-container dark:bg-tertiary-on-container-dark text-tertiary-container dark:text-tertiary-container-dark rounded-lg font-bold text-sm shadow-sm hover:opacity-90"
+                                    >
+                                        Confirm
+                                    </button>
+                                </div>
+                                <p className="text-xs opacity-80">
+                                    Deducting {swapCount} cylinder{swapCount !== 1 ? 's' : ''} from stock.
                                 </p>
-                            </button>
+                            </div>
 
+                            {/* REFILL SECTION */}
                              <div className="p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
                                 <p className="font-bold text-base text-surface-on dark:text-surface-on-dark mb-2">Add Stock (Refill)</p>
                                 <div className="flex items-center gap-3">
@@ -89,11 +108,11 @@ const GasTrackerCard: React.FC = () => {
                                         type="number" 
                                         value={refillCount}
                                         onChange={(e) => setRefillCount(parseInt(e.target.value) || 0)}
-                                        className="w-16 p-2 text-center rounded-lg bg-surface dark:bg-surface-dark border border-surface-outline/20 dark:border-surface-outline-dark/20"
+                                        className="w-16 h-10 p-2 text-center font-bold rounded-lg bg-surface dark:bg-surface-dark border border-surface-outline/20 dark:border-surface-outline-dark/20 text-surface-on dark:text-surface-on-dark"
                                     />
                                     <button 
                                         onClick={onRefillConfirm}
-                                        className="flex-grow py-2 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-lg font-medium text-sm"
+                                        className="flex-grow h-10 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-lg font-bold text-sm hover:opacity-90"
                                     >
                                         Add to Inventory
                                     </button>
