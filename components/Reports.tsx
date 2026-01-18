@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateTotalExpenses, getTodayDateString, getThisWeekRange, getLastWeekRange, getThisMonthRange, getLastMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
+import { calculateTotalExpenses, getTodayDateString, getLast7DaysRange, getThisMonthRange, getLastMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
 import DateRangePicker from './DateRangePicker';
 import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
@@ -10,7 +10,7 @@ import { saveCsvFile } from '../utils/capacitor-utils';
 import { convertToCSV } from '../utils/csv-utils';
 import Modal from './Modal';
 
-type FilterPreset = 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'ALL_TIME' | 'CUSTOM';
+type FilterPreset = 'LAST_7_DAYS' | 'THIS_MONTH' | 'LAST_MONTH' | 'ALL_TIME' | 'CUSTOM';
 type MetricType = 'NET_PROFIT' | 'PROFIT_MARGIN' | 'PRIME_COST' | 'FOOD_COST' | 'LABOR_COST' | 'TOTAL_SALES' | 'TOTAL_EXPENSES';
 
 interface ModalInfo {
@@ -121,11 +121,8 @@ const Reports: React.FC = () => {
         let endStr = '';
 
         switch (filter) {
-            case 'THIS_WEEK':
-                ({ start: startStr, end: endStr } = getThisWeekRange());
-                break;
-            case 'LAST_WEEK':
-                ({ start: startStr, end: endStr } = getLastWeekRange());
+            case 'LAST_7_DAYS':
+                ({ start: startStr, end: endStr } = getLast7DaysRange());
                 break;
             case 'THIS_MONTH':
                 ({ start: startStr, end: endStr } = getThisMonthRange());
@@ -412,7 +409,7 @@ const Reports: React.FC = () => {
             return `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate || dateRange.startDate)}`;
         }
         const map: Record<FilterPreset, string> = {
-            THIS_WEEK: 'This Week', LAST_WEEK: 'Last Week', THIS_MONTH: 'This Month',
+            LAST_7_DAYS: 'Last 7 Days', THIS_MONTH: 'This Month',
             LAST_MONTH: 'Last Month', ALL_TIME: 'All Time', CUSTOM: 'Custom'
         };
         return map[f];
@@ -427,7 +424,7 @@ const Reports: React.FC = () => {
         );
     }
 
-    const filterOptions: FilterPreset[] = ['THIS_MONTH', 'LAST_MONTH', 'THIS_WEEK', 'ALL_TIME'];
+    const filterOptions: FilterPreset[] = ['LAST_7_DAYS', 'THIS_MONTH', 'LAST_MONTH', 'ALL_TIME'];
 
     const displayedExpenses = showAllExpenses ? reportData.sortedExpenseItems : reportData.sortedExpenseItems.slice(0, 5);
 

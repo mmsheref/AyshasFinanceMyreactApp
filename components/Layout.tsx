@@ -27,16 +27,14 @@ const Layout: React.FC = () => {
     const handleBack = () => navigate(-1);
 
     // MD3 Navigation Bar Item
-    // Active: Icon in Pill (Primary Container), Text Bold & High Emphasis
-    // Inactive: Icon transparent, Text Normal & Medium Emphasis
     const NavItem = ({ to, icon, label }: { to: string, icon: React.ReactNode, label: string }) => (
-        <NavLink to={to} className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full gap-1 group`}>
+        <NavLink to={to} className={({ isActive }) => `flex flex-col items-center justify-center flex-1 h-full gap-1 group active:scale-95 transition-transform duration-100`}>
             {({ isActive }) => (
                 <>
-                    <div className={`w-16 h-8 flex items-center justify-center rounded-full transition-all duration-300 ${isActive ? 'bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark' : 'bg-transparent text-surface-on-variant dark:text-surface-on-variant-dark'}`}>
+                    <div className={`relative w-12 h-8 flex items-center justify-center rounded-full transition-all duration-300 ${isActive ? 'bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark' : 'bg-transparent text-surface-on-variant dark:text-surface-on-variant-dark'}`}>
                         {icon}
                     </div>
-                    <span className={`text-[12px] transition-colors ${isActive ? 'font-bold text-surface-on dark:text-surface-on-dark' : 'font-medium text-surface-on-variant dark:text-surface-on-variant-dark'}`}>
+                    <span className={`text-[11px] font-medium transition-colors ${isActive ? 'text-surface-on dark:text-surface-on-dark font-bold' : 'text-surface-on-variant dark:text-surface-on-variant-dark'}`}>
                         {label}
                     </span>
                 </>
@@ -48,14 +46,14 @@ const Layout: React.FC = () => {
         <div className="min-h-screen font-sans flex flex-col bg-surface dark:bg-surface-dark text-surface-on dark:text-white">
             {/* Top App Bar (Only for non-dashboard pages) */}
             {!isDashboard && (
-                <header className="sticky top-0 z-20 bg-surface dark:bg-surface-dark pt-[env(safe-area-inset-top)] px-4 h-[64px] flex items-center justify-between transition-colors duration-200">
-                    <div className="flex items-center">
+                <header className="sticky top-0 z-30 bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md pt-[env(safe-area-inset-top)] px-4 h-[64px] flex items-center justify-between border-b border-surface-outline/5 dark:border-surface-outline-dark/5">
+                    <div className="flex items-center w-full">
                         {!isRootPage && (
-                            <button onClick={handleBack} className="p-3 mr-1 -ml-3 rounded-full hover:bg-surface-variant/30 active:bg-surface-variant/50 transition-colors" aria-label="Go back">
+                            <button onClick={handleBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-surface-variant/30 active:bg-surface-variant/50 transition-colors" aria-label="Go back">
                                 <BackIcon className="w-6 h-6 text-surface-on dark:text-white" />
                             </button>
                         )}
-                        <h1 className="text-xl font-medium tracking-normal text-surface-on dark:text-white pl-2">
+                        <h1 className="text-xl font-semibold tracking-tight text-surface-on dark:text-white flex-grow truncate">
                             {getHeaderText()}
                         </h1>
                     </div>
@@ -64,30 +62,30 @@ const Layout: React.FC = () => {
             
             {/* Main Content */}
             <main 
-                className={`flex-grow px-4 pb-24 animate-fadeScale ${isDashboard ? 'pt-[calc(env(safe-area-inset-top)+1rem)]' : ''}`}
+                className={`flex-grow px-4 pb-32 animate-fadeScale ${isDashboard ? 'pt-[calc(env(safe-area-inset-top)+1.5rem)]' : 'pt-4'}`}
             >
                 <Outlet />
             </main>
 
-            {/* MD3 Bottom Navigation Bar */}
+            {/* MD3 Bottom Navigation Bar with Glassmorphism */}
             {showBottomNav && (
-                <nav className="fixed bottom-0 left-0 right-0 bg-surface-container/90 dark:bg-surface-dark-container/90 backdrop-blur-xl z-30 border-t border-surface-outline/10 dark:border-surface-outline-dark/10 pb-[env(safe-area-inset-bottom)] h-[80px] flex items-center justify-between px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                    <NavItem to="/" icon={<HomeIcon className="w-6 h-6" />} label="Home" />
-                    <NavItem to="/records" icon={<ListIcon className="w-6 h-6" />} label="Records" />
-                    <NavItem to="/reports" icon={<ChartBarIcon className="w-6 h-6" />} label="Reports" />
-                    <NavItem to="/settings" icon={<SettingsIcon className="w-6 h-6" />} label="Settings" />
+                <nav className="fixed bottom-0 left-0 right-0 bg-surface-container/85 dark:bg-surface-dark-container/85 backdrop-blur-xl z-40 border-t border-surface-outline/10 dark:border-surface-outline-dark/10 pb-[env(safe-area-inset-bottom)] h-[84px] flex items-center justify-between px-4 shadow-[0_-4px_30px_rgba(0,0,0,0.03)]">
+                    <NavItem to="/" icon={<HomeIcon className="w-5 h-5" />} label="Home" />
+                    <NavItem to="/records" icon={<ListIcon className="w-5 h-5" />} label="Records" />
+                    <NavItem to="/reports" icon={<ChartBarIcon className="w-5 h-5" />} label="Reports" />
+                    <NavItem to="/settings" icon={<SettingsIcon className="w-5 h-5" />} label="Settings" />
                 </nav>
             )}
 
-            {/* MD3 Floating Action Button (FAB) */}
+            {/* Floating Action Button (FAB) */}
             {['/', '/records'].includes(location.pathname) && (
-                <div className="fixed bottom-[100px] right-4 z-40">
+                <div className="fixed bottom-[100px] right-5 z-50">
                     <button
                         onClick={() => navigate('/records/new')}
-                        className="w-14 h-14 bg-primary-container dark:bg-primary-container-dark hover:bg-primary-container/90 dark:hover:bg-primary-container-dark/90 active:scale-95 text-primary-on-container dark:text-primary-on-container-dark rounded-[16px] shadow-md3-1 flex items-center justify-center transition-all duration-200"
+                        className="group relative w-14 h-14 bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark rounded-[18px] shadow-lg shadow-primary/20 flex items-center justify-center transition-all duration-200 active:scale-90 active:shadow-sm"
                         aria-label="Add New Record"
                     >
-                        <PlusIcon className="h-7 w-7" />
+                        <PlusIcon className="h-7 w-7 transition-transform group-active:rotate-90" />
                     </button>
                 </div>
             )}

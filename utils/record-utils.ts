@@ -58,29 +58,12 @@ export const subtractDays = (refDateStr: string, days: number): string => {
 };
 
 /**
- * Gets the start and end date strings for "This Week" (Starts Monday).
+ * Gets the start and end date strings for "Last 7 Days" (Rolling window).
  */
-export const getThisWeekRange = (): { start: string, end: string } => {
+export const getLast7DaysRange = (): { start: string, end: string } => {
     const todayStr = getTodayDateString();
-    const today = parseLocalDate(todayStr);
-    const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
-    
-    // Convert to Monday start:
-    // JS getDay(): Sun=0, Mon=1, Tue=2, ... Sat=6
-    const daysFromMonday = (dayOfWeek + 6) % 7;
-    
-    const startStr = subtractDays(todayStr, daysFromMonday);
+    const startStr = subtractDays(todayStr, 6); // Today is day 1, so subtract 6 for 7 days
     return { start: startStr, end: todayStr };
-};
-
-/**
- * Gets the start and end date strings for "Last Week" (Mon-Sun).
- */
-export const getLastWeekRange = (): { start: string, end: string } => {
-    const thisWeekStart = getThisWeekRange().start;
-    const endStr = subtractDays(thisWeekStart, 1); // Last Sunday
-    const startStr = subtractDays(endStr, 6); // Last Monday
-    return { start: startStr, end: endStr };
 };
 
 /**
