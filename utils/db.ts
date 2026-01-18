@@ -205,6 +205,18 @@ export const saveGasLog = async (log: GasLog): Promise<void> => {
     });
 };
 
+export const deleteGasLog = async (id: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(GAS_LOGS_STORE, 'readwrite');
+        const store = transaction.objectStore(GAS_LOGS_STORE);
+        const request = store.delete(id);
+
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
 export const bulkAddGasLogs = async (logs: GasLog[]): Promise<void> => {
     const db = await openDB();
     return new Promise((resolve, reject) => {

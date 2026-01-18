@@ -25,9 +25,17 @@ const DEFAULT_CARD_VISIBILITY: ReportCardVisibilitySettings = {
 
 const DEFAULT_GAS_CONFIG: GasConfig = {
     totalCylinders: 6, // Default total
-    currentStock: 0,
     cylindersPerBank: 2, 
+    currentStock: 0, // Legacy/Cache
 };
+
+interface GasState {
+    currentStock: number;
+    emptyCylinders: number;
+    avgDailyUsage: number;
+    daysSinceLastSwap: number;
+    projectedDaysLeft: number;
+}
 
 interface AppContextType {
     records: DailyRecord[];
@@ -40,7 +48,7 @@ interface AppContextType {
     reportCardVisibility: ReportCardVisibilitySettings;
     gasConfig: GasConfig;
     gasLogs: GasLog[];
-    gasStats: { avgDailyUsage: number; daysSinceLastSwap: number };
+    gasState: GasState;
     activeYear: string; // 'all' or 'YYYY'
     availableYears: string[];
     isLoading: boolean;
@@ -58,8 +66,8 @@ interface AppContextType {
     handleUpdateTrackedItems: (newItems: string[]) => Promise<void>;
     handleUpdateReportCardVisibility: (newVisibility: ReportCardVisibilitySettings) => Promise<void>;
     handleUpdateGasConfig: (config: GasConfig) => Promise<void>;
-    handleLogGasSwap: (count: number) => Promise<void>;
-    handleGasRefill: (count: number) => Promise<void>;
+    handleGasAction: (log: GasLog) => Promise<void>;
+    handleDeleteGasLog: (id: string) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -112,10 +120,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 const storedVisibility = await db.getSetting('reportCardVisibility');
                 if (storedVisibility) setReportCardVisibility(storedVisibility);
+                
+                const storedActiveYear = await db.getSetting('activeYear');
+                if (storedActiveYear) setActiveYearInternal(storedActiveYear);
 
                 const storedGasConfig = await db.getSetting('gasConfig');
                 if (storedGasConfig) {
-                    // Ensure totalCylinders exists for migrated data
                     setGasConfig({ ...DEFAULT_GAS_CONFIG, ...storedGasConfig });
                 }
 
@@ -156,9 +166,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const activeYearRecords = useMemo(() => {
         if (activeYear === 'all') return records;
-        
-        // Calendar Year Logic (Jan 1 to Dec 31)
-        // Date format YYYY-MM-DD starts with YYYY
         return records.filter(r => r.date.startsWith(activeYear));
     }, [records, activeYear]);
 
@@ -166,7 +173,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (records.length === 0) return [];
         const years = new Set<string>();
         records.forEach(r => {
-            // Extract YYYY from YYYY-MM-DD
             const year = r.date.substring(0, 4);
             years.add(year);
         });
@@ -181,42 +187,92 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return [...records].sort((a, b) => b.date.localeCompare(a.date));
     }, [records]);
     
-    // Gas Stats Calculation
-    const gasStats = useMemo(() => {
-        // Only count 'USAGE' logs for consumption stats
+    // --- Dynamic Gas State Calculation ---
+    const gasState: GasState = useMemo(() => {
+        // 1. Calculate Current Stock based on logs history
+        // Sort chronologically for calculation (Oldest First)
+        const chronoLogs = [...gasLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        let calculatedStock = 0;
+
+        chronoLogs.forEach(log => {
+            if (log.type === 'REFILL') {
+                calculatedStock += log.count;
+            } else if (log.type === 'USAGE') {
+                calculatedStock -= log.count;
+            } else if (log.type === 'ADJUSTMENT') {
+                calculatedStock = log.count; // Reset to specific value
+            }
+        });
+
+        // Ensure stock doesn't go below zero visually (though mathematically it might if data is missing)
+        // If stock is negative, it implies user forgot to log refills.
+        const currentStock = calculatedStock; 
+
+        // 2. Stats
         const usageLogs = gasLogs.filter(l => l.type === 'USAGE');
         
-        if (usageLogs.length === 0) return { avgDailyUsage: 0, daysSinceLastSwap: -1 };
-
-        const lastSwap = new Date(usageLogs[0].date);
-        const today = new Date();
-        const diffTime = Math.abs(today.getTime() - lastSwap.getTime());
-        const daysSinceLastSwap = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
-
-        // Calc Usage
-        // Look at last 60 days
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        
-        const recentLogs = usageLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
-        
         let avgDailyUsage = 0;
-        if (recentLogs.length > 0) {
-            const totalSwapped = recentLogs.reduce((sum, l) => sum + l.count, 0);
+        let daysSinceLastSwap = -1;
+        let projectedDaysLeft = 0;
+
+        if (usageLogs.length > 0) {
+            // Days since last swap (Newest Usage Log)
+            // gasLogs is already sorted Newest First
+            const lastUsageLog = gasLogs.find(l => l.type === 'USAGE');
+            if (lastUsageLog) {
+                const lastSwapDate = new Date(lastUsageLog.date);
+                const today = new Date();
+                const diffTime = today.getTime() - lastSwapDate.getTime();
+                daysSinceLastSwap = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            }
+
+            // Calc Avg Usage (Last 60 Days)
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
             
-            // Time window is from first recent log to today
-            // FIX: Ensure timeSpan is at least 1 day to avoid division by zero
-            const firstRecentLogDate = new Date(recentLogs[recentLogs.length - 1].date);
-            const timeSpan = Math.max(1, Math.floor((today.getTime() - firstRecentLogDate.getTime()) / (1000 * 60 * 60 * 24)));
+            const recentLogs = usageLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
             
-            avgDailyUsage = totalSwapped / timeSpan;
+            if (recentLogs.length > 1) {
+                const totalSwapped = recentLogs.reduce((sum, l) => sum + l.count, 0);
+                
+                // Get range from first recent log to NOW
+                const firstRecentLogDate = new Date(recentLogs[recentLogs.length - 1].date);
+                const today = new Date();
+                const timeSpan = Math.max(1, Math.floor((today.getTime() - firstRecentLogDate.getTime()) / (1000 * 60 * 60 * 24)));
+                
+                avgDailyUsage = totalSwapped / timeSpan;
+            } else if (recentLogs.length === 1) {
+                // If only 1 log recently, fallback to longer history or just that 1 log over days since
+                const log = recentLogs[0];
+                const daysSince = Math.max(1, Math.floor((new Date().getTime() - new Date(log.date).getTime()) / (1000 * 60 * 60 * 24)));
+                avgDailyUsage = log.count / daysSince;
+            }
         }
 
-        return { avgDailyUsage, daysSinceLastSwap };
-    }, [gasLogs]);
+        // 3. Projected Days Left (based on current active bank + stock)
+        if (avgDailyUsage > 0) {
+            // Total gas available = Current Full Stock + Active (Approximated as 50% used? No, assume full capacity available from stock)
+            // + Active bank is currently burning.
+            // Let's assume Active Bank is 50% depleted on average, so we count Stock.
+            // Simple projection: Stock / AvgUsage
+            projectedDaysLeft = Math.floor(currentStock / avgDailyUsage);
+        }
+
+        const emptyCylinders = Math.max(0, (gasConfig.totalCylinders || 0) - (gasConfig.cylindersPerBank || 0) - Math.max(0, currentStock));
+
+        return {
+            currentStock: Math.max(0, currentStock), // UI shouldn't show negative
+            emptyCylinders,
+            avgDailyUsage,
+            daysSinceLastSwap,
+            projectedDaysLeft
+        };
+    }, [gasLogs, gasConfig]);
 
 
     const setActiveYear = async (year: string) => {
+        await db.saveSetting('activeYear', year);
         setActiveYearInternal(year);
     };
 
@@ -314,36 +370,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setGasConfig(config);
     };
 
-    const handleLogGasSwap = async (count: number) => {
-        // FIX: Prevent negative stock
-        const newStock = Math.max(0, gasConfig.currentStock - count);
-        
-        const newConfig = { ...gasConfig, currentStock: newStock };
-        await handleUpdateGasConfig(newConfig);
-
-        const newLog: GasLog = {
-            id: uuidv4(),
-            date: new Date().toISOString(),
-            type: 'USAGE',
-            count: count
-        };
-        await db.saveGasLog(newLog);
-        setGasLogs(prev => [newLog, ...prev]);
+    // Unified Gas Action Handler (Add/Edit)
+    const handleGasAction = async (log: GasLog) => {
+        await db.saveGasLog(log);
+        setGasLogs(prev => {
+            // Remove existing if it's an edit, then add new
+            const filtered = prev.filter(l => l.id !== log.id);
+            const newList = [log, ...filtered];
+            // Keep sorted new to old
+            return newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        });
     };
 
-    const handleGasRefill = async (count: number) => {
-        const newStock = gasConfig.currentStock + count;
-        const newConfig = { ...gasConfig, currentStock: newStock };
-        await handleUpdateGasConfig(newConfig);
-
-        const newLog: GasLog = {
-            id: uuidv4(),
-            date: new Date().toISOString(),
-            type: 'REFILL',
-            count: count
-        };
-        await db.saveGasLog(newLog);
-        setGasLogs(prev => [newLog, ...prev]);
+    const handleDeleteGasLog = async (id: string) => {
+        await db.deleteGasLog(id); // Assume this method exists in db.ts or add it
+        setGasLogs(prev => prev.filter(l => l.id !== id));
     };
 
     return (
@@ -358,7 +399,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             reportCardVisibility,
             gasConfig,
             gasLogs,
-            gasStats,
+            gasState,
             activeYear,
             availableYears,
             isLoading,
@@ -376,8 +417,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             handleUpdateTrackedItems,
             handleUpdateReportCardVisibility,
             handleUpdateGasConfig,
-            handleLogGasSwap,
-            handleGasRefill
+            handleGasAction,
+            handleDeleteGasLog
         }}>
             {children}
         </AppContext.Provider>

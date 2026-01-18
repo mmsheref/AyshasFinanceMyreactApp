@@ -32,25 +32,27 @@ export type CustomExpenseStructure = {
 
 export interface GasConfig {
   totalCylinders: number; // Total number of cylinders owned (Active + Full + Empty)
-  currentStock: number; // Full cylinders currently in storage (Ready to use)
   cylindersPerBank: number; // Number of cylinders connected to the stove (Active)
+  // currentStock is now derived from logs, but we keep this field for legacy migration or as a cache if needed
+  currentStock?: number; 
 }
 
-export type GasLogType = 'USAGE' | 'REFILL';
+export type GasLogType = 'USAGE' | 'REFILL' | 'ADJUSTMENT';
 
 export interface GasLog {
   id: string;
   date: string;
   type: GasLogType;
   count: number;
-  cylindersSwapped?: number; // Legacy field, optional now
+  notes?: string;
+  cylindersSwapped?: number; // Legacy field
 }
 
 export interface BackupData {
   version: number;
   records: DailyRecord[];
   customStructure: CustomExpenseStructure;
-  gasLogs?: GasLog[]; // Optional for backward compatibility
+  gasLogs?: GasLog[]; 
   gasConfig?: GasConfig;
 }
 

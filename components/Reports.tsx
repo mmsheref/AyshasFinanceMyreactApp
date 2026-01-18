@@ -26,6 +26,7 @@ interface ModalInfo {
     text: string;
     rating: 'good' | 'average' | 'warning' | 'info';
   };
+  stats?: { label: string; value: string }[];
 }
 
 // Improved Card Design for "Native" Feel
@@ -236,7 +237,9 @@ const Reports: React.FC = () => {
         const { totalSales, totalExpenses, totalFoodCost, totalLaborCost, netProfit, profitMargin, primeCostPercentage, foodCostPercentage, laborCostPercentage } = reportData;
         let info: ModalInfo | null = null;
         
-        const formatAsRupee = (num: number) => `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+        const formatAsRupee = (num: number) => `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+        const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-';
+        const recordCount = filteredRecords.length;
 
         switch(metric) {
             case 'NET_PROFIT':
@@ -247,7 +250,12 @@ const Reports: React.FC = () => {
                     analysis: {
                         text: netProfit >= 0 ? 'Profitable period.' : 'Loss period.',
                         rating: netProfit >= 0 ? 'good' : 'warning',
-                    }
+                    },
+                    stats: [
+                        { label: 'Avg Daily Profit', value: formatAsRupee(reportData.avgDailyProfit) },
+                        { label: 'Best Day', value: `${formatAsRupee(reportData.mostProfitableDay.amount)}` },
+                        { label: 'Date', value: formatDate(reportData.mostProfitableDay.date) }
+                    ]
                 };
                 break;
             case 'PROFIT_MARGIN':
@@ -310,16 +318,29 @@ const Reports: React.FC = () => {
                 info = {
                     title: 'Total Sales', value: formatAsRupee(totalSales),
                     description: "Total revenue before expenses.",
-                    calculation: { formula: 'Sum of daily sales', values: 'Total revenue.' },
-                    analysis: { text: 'Revenue generated.', rating: 'info' }
+                    calculation: { formula: 'Sum of daily sales', values: `Sum of ${recordCount} records` },
+                    analysis: { text: 'Revenue generated.', rating: 'info' },
+                    stats: [
+                        { label: 'Avg Daily Sales', value: formatAsRupee(reportData.avgDailySales) },
+                        { label: 'Highest Sales', value: `${formatAsRupee(reportData.busiestDay.amount)}` },
+                        { label: 'Date', value: formatDate(reportData.busiestDay.date) }
+                    ]
                 };
                 break;
             case 'TOTAL_EXPENSES':
+                 const avgExp = recordCount > 0 ? totalExpenses / recordCount : 0;
+                 const topCat = reportData.topCategories.length > 0 ? reportData.topCategories[0] : null;
+                 
                  info = {
                     title: 'Total Expenses', value: formatAsRupee(totalExpenses),
                     description: "Total operational costs.",
-                    calculation: { formula: 'Sum of daily expenses', values: 'Total costs.' },
-                    analysis: { text: 'Costs incurred.', rating: 'info' }
+                    calculation: { formula: 'Sum of daily expenses', values: `Sum of ${recordCount} records` },
+                    analysis: { text: 'Costs incurred.', rating: 'info' },
+                    stats: [
+                        { label: 'Avg Daily Expenses', value: formatAsRupee(avgExp) },
+                        { label: 'Top Category', value: topCat ? topCat.name : '-' },
+                        { label: 'Amount', value: topCat ? formatAsRupee(topCat.value) : '-' }
+                    ]
                 };
                 break;
         }
@@ -519,6 +540,18 @@ const Reports: React.FC = () => {
                         </div>
                         <div className="space-y-4">
                             <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm leading-relaxed">{modalInfo.description}</p>
+                            
+                            {modalInfo.stats && (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {modalInfo.stats.map((stat, i) => (
+                                        <div key={i} className="bg-surface-container-high dark:bg-surface-dark-container-high p-3 rounded-xl">
+                                            <p className="text-[10px] uppercase text-surface-on-variant dark:text-surface-on-variant-dark font-bold mb-1 opacity-70">{stat.label}</p>
+                                            <p className="text-sm font-bold text-surface-on dark:text-surface-on-dark leading-tight">{stat.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <div className="p-3 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
                                 <p className="text-xs font-mono text-surface-on dark:text-surface-on-dark opacity-70 mb-1">Calculation</p>
                                 <p className="text-sm font-medium text-surface-on dark:text-surface-on-dark break-all">{modalInfo.calculation.values}</p>

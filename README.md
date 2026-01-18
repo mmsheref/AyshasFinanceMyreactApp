@@ -1,53 +1,82 @@
-# Aysha's P&L Dashboard
+# Ayshas Finance Tracker
 
-Aysha's P&L Dashboard is a comprehensive, mobile-first web application designed to help restaurant owners track their daily profit and loss with ease. It provides a simple and intuitive interface to manage daily sales, categorize expenses, and gain insights into financial performance. Built with modern web technologies and a focus on offline-first functionality, it ensures your data is always accessible.
+A comprehensive, mobile-first P&L dashboard designed for restaurant owners to track daily finances, manage inventory, and gain deep insights into their business performance. Developed by **Ameer**, this application combines simplicity with powerful analytics, running completely offline on your device.
 
-## Key Features
+## 📥 Download App
 
-*   **At-a-Glance Dashboard**: A comprehensive overview of your financial health, including key metrics like 7-day and 30-day average profit, total profit, and recent activity.
-*   **In-Depth Reports Page**: A dedicated section for deep financial analysis with powerful date filtering.
-    *   **KPI Summary**: View total sales, expenses, net profit, profit margin, and average daily profit for any period.
-    *   **Expense Analysis**: A visual donut chart and list break down expenses by category, while a "Top 5" list identifies your biggest individual costs.
-    *   **Sales Insights**: Compare morning vs. night sales performance and analyze daily trends.
-*   **Advanced Data Visualization**:
-    *   **Profit/Loss Trend Chart**: A bar chart visualizing profit and loss over time.
-    *   **Sales Trend Chart**: A stacked bar chart breaking down morning vs. night sales.
-    *   **Dynamic Filtering**: Filter all charts by preset ranges (7D, 30D, 90D, All-Time) or a custom date range for deeper analysis.
-*   **Granular Sales Tracking**: Log morning and night sales separately to get a clearer picture of your daily revenue streams.
-*   **Full CRUD for Records**: Easily create, view, update, and delete daily financial records.
-*   **Detailed & Customizable Expenses**:
-    *   Log expenses across multiple categories.
-    *   The app intelligently pre-fills recurring costs (e.g., Labour, Rent) from your most recent entry to speed up data entry.
-    *   **Fully Customizable Structure**: Add, edit, or remove expense categories and items directly from the Settings page to perfectly match your business needs.
-*   **Bill Photo Upload**: Attach one or more bill photos to any expense item for easy record-keeping. Images are automatically compressed for efficient offline storage.
-*   **Search and Filter**: Quickly find past records using the date-based search and filtering functionality.
-*   **Shareable Reports**: Generate a clean, shareable PNG image of any daily record's detailed breakdown. The report theme automatically matches your app's light or dark mode setting.
-*   **Robust Data Management**:
-    *   **Backup & Restore**: Safeguard your data by exporting all records to a single `.json` file. Restore from a backup at any time.
-    *   **CSV Export**: Export all financial data to a `.csv` file for use in spreadsheet software like Excel or Google Sheets.
-*   **Personalization**:
-    *   **Theme Support**: Choose between Light, Dark, or System default themes for a comfortable viewing experience.
-*   **Mobile-First & Offline-Ready**: Designed with a mobile-first approach and built as a Progressive Web App (PWA). All data is stored locally in your browser's IndexedDB, so the app works perfectly even without an internet connection.
-*   **Native Device Integration**: Uses Capacitor to provide a more native app-like experience, including native file saving, sharing dialogs, and back button handling on Android.
+**Android Users**: Get the latest APK from the **Releases** section on GitHub.
 
-## Technology Stack
+1.  Go to the [**Releases**](https://github.com/mmsheref/AyshasFinanceMyreactApp/releases) page.
+2.  Find the latest version (e.g., `v2.4.0`).
+3.  Click on **Assets** and download the `.apk` file.
+4.  Install it on your Android device.
 
-*   **Frontend Framework**: React
-*   **Language**: TypeScript
+## 🚀 Key Features
+
+### 📊 Dashboard & Analytics
+*   **Real-time Pulse**: Instantly view today's live performance, including sales, expenses, and net profit.
+*   **Weekly & Monthly Trends**: Visual charts for Profit/Loss trends and Sales Splits (Morning vs. Night).
+*   **Key Metrics**: Track Net Profit, Profit Margin, Prime Cost %, Food Cost %, and Labor Cost %.
+*   **Date Filtering**: Analyze data by Week, Month, Year, or Custom Date Ranges.
+
+### 🔥 Gas Inventory Management
+*   **Stock Tracking**: Keep a precise count of Full vs. Empty cylinders.
+*   **Usage Logging**: Log when a cylinder is connected (usage) or when stock is refilled (exchange).
+*   **Smart Stats**: Automatically calculates your **Average Daily Usage** and **Days Since Last Swap**.
+*   **History Log**: View a detailed timeline of all gas-related activities.
+
+### 📦 Inventory Watch
+*   **Last Purchase Tracker**: Select specific items (e.g., "Rice", "Oil") to watch.
+*   **Days Ago Counter**: The dashboard tells you exactly how many days have passed since you last purchased these items, helping you prevent stockouts or over-ordering.
+
+### 📝 Daily Records
+*   **Granular Entry**: Log Morning Sales, Total Sales, and detailed expenses across custom categories.
+*   **Bill Photos**: Attach receipts/bills directly to expense items using the Camera or Gallery. Images are compressed and stored locally.
+*   **Recurring Defaults**: Set default values for frequent expenses to speed up data entry.
+*   **Shop Closed Mode**: Mark days as closed to track fixed costs (Rent, Electricity) without sales.
+
+### 📂 Data Management & Security
+*   **Offline-First**: All data is stored locally on your device. No internet required.
+*   **Backup & Restore**: Export your full database to a JSON file for safekeeping.
+*   **CSV Export**: Export reports and raw data to CSV for Excel/Google Sheets analysis.
+*   **Structure Import/Export**: Share your expense category setup across devices.
+
+### 🎨 User Experience
+*   **Material Design 3**: A beautiful, modern interface with support for Light, Dark, and System themes.
+*   **Native Feel**: Haptic feedback, smooth animations, and native sharing dialogs via Capacitor.
+*   **Developer Branding**: Proudly developed by Ameer.
+
+## 🛠 Technology Stack
+
+*   **Frontend**: React 18, TypeScript
 *   **Styling**: Tailwind CSS
-*   **Routing**: React Router
-*   **State Management**: React Context API
-*   **Offline Storage**: IndexedDB
-*   **Native Runtime**: Capacitor
-*   **Build Tool**: Vite (Implicit via the development environment)
+*   **Icons**: Heroicons
+*   **Build Tool**: Vite
+*   **Mobile Runtime**: Capacitor (Android/iOS)
+*   **Storage**: IndexedDB (Local Browser Storage)
+*   **Routing**: React Router DOM
 
-## How to Use
+## 📱 How to Use
 
-1.  **Open the App**: Launch the application in your web browser or as a standalone app.
-2.  **Onboarding**: The first time you open the app, you'll see a brief overview of its features.
-3.  **Add a Record**: Tap the `+` button on the Dashboard or Records screen to create a new entry for the day.
-4.  **Enter Data**: Fill in the date, morning sales, and total sales. Go through the expense accordions to input your daily costs. Attach bill photos where needed.
-5.  **Save**: Once done, save the record.
-6.  **Analyze**: Use the dashboard charts and filters to see your performance over time. View detailed reports for specific days by tapping on them in the "Records" list.
-7.  **Customize (Recommended)**: Go to **Settings -> Manage Expense Structure** to add your own custom expense items and categories.
-8.  **Backup**: Regularly use the "Export Backup" feature in the Settings menu to back up your records.
+### 1. Initial Setup
+*   **Onboarding**: Follow the welcome screens to understand the basics.
+*   **Settings**: Go to *Settings > Expense Structure* to define your categories (e.g., Meat, Vegetables, Labor) and items.
+*   **Gas Setup**: Go to *Settings > Gas Configuration* to input your total cylinders and current stock.
+
+### 2. Daily Routine
+*   **Add Record**: Tap the **+** button. Enter the date, sales figures, and fill in expenses.
+*   **Upload Bills**: Tap the camera icon next to an expense item to attach a photo.
+*   **Gas Check**: If you changed a cylinder, tap the **Gas Inventory** card on the dashboard and select "Connect Fresh Cylinder".
+
+### 3. Analysis
+*   **Dashboard**: Check the "Resources" section for inventory alerts and the "Trends" section for financial health.
+*   **Reports**: Navigate to the Reports tab for a deep dive into Food Costs, Labor Costs, and category breakdowns.
+*   **Share**: Open any record detail and tap the **Share** button at the top to generate a professional PNG report to share via WhatsApp or Email.
+
+## 👨‍💻 Developer
+
+**Developed by Ameer**
+*Lead Developer & Designer*
+
+---
+*Version 2.4.0*
