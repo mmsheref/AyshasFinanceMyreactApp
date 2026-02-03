@@ -11,6 +11,9 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => v
     const totalExpenses = useMemo(() => calculateTotalExpenses(record), [record]);
     const profit = record.totalSales - totalExpenses;
     const isProfit = profit >= 0;
+    
+    // Determine Status
+    const isInProgress = !record.isClosed && !record.isCompleted;
 
     return (
         <div 
@@ -46,7 +49,12 @@ const RecordCard: React.FC<{record: DailyRecord, onView: (recordId: string) => v
                     ) : (
                         <>
                             <div className="flex justify-between items-baseline mb-1">
-                                <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Net Profit</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Net Profit</span>
+                                    {isInProgress && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-tertiary-container dark:bg-tertiary-container-dark text-tertiary-on-container dark:text-tertiary-on-container-dark font-bold">IN PROGRESS</span>
+                                    )}
+                                </div>
                                 <span className={`text-lg font-bold tracking-tight ${isProfit ? 'text-success dark:text-success-dark' : 'text-error dark:text-error-dark'}`}>
                                     {isProfit ? '+' : '-'}₹{Math.abs(profit).toLocaleString('en-IN')}
                                 </span>
@@ -156,8 +164,6 @@ const RecordList: React.FC = () => {
   
   return (
     <div className="space-y-4">
-      {/* Header - now handled by Layout but we keep search here */}
-        
       {/* Search & Filter Bar */}
       <div className="sticky top-0 z-20 space-y-3 bg-surface/95 dark:bg-surface-dark/95 backdrop-blur-sm pb-2 pt-2 transition-colors -mx-4 px-4 border-b border-surface-outline/5 dark:border-surface-outline-dark/5">
         <div className="flex gap-2">

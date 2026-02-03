@@ -54,6 +54,14 @@ export const runMigration = (recordsToMigrate: DailyRecord[]): { migratedRecords
             needsUpdate = true;
         }
 
+        // Migration 4: Add isCompleted if it doesn't exist
+        if (typeof rec.isCompleted === 'undefined') {
+            // Default to true for existing records (assume history is finalized)
+            // to avoid showing "In Progress" for old entries.
+            rec.isCompleted = true; 
+            needsUpdate = true;
+        }
+
         if (!rec.expenses) {
             rec.expenses = [];
         }

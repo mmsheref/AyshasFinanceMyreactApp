@@ -18,7 +18,8 @@ export interface DailyRecord {
   totalSales: number;
   morningSales: number;
   expenses: ExpenseCategory[];
-  isClosed?: boolean; // New field to mark holidays/off days
+  isClosed?: boolean; // Holidays/off days
+  isCompleted?: boolean; // New: True if the day is finalized, False if in-progress
 }
 
 export interface ExpenseStructureItem {

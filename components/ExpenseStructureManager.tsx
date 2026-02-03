@@ -1,10 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { CustomExpenseStructure } from '../types';
-import { PencilSquareIcon, TrashIcon, CheckIcon, XMarkIcon, PlusIcon, ChevronDownIcon, WarningIcon, DownloadIcon, UploadIcon, CameraIcon } from './Icons';
-import Modal from './Modal';
-import { saveStructureFile } from '../utils/capacitor-utils';
-import { isCustomStructure } from '../utils/validation-utils';
+import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, DragHandleIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
 
 interface ExpenseStructureManagerProps {
     structure: CustomExpenseStructure;
@@ -12,360 +9,420 @@ interface ExpenseStructureManagerProps {
     initialBillUploadCategories: string[];
 }
 
-type DeleteType = 'category' | 'item';
-
-interface DeleteConfirmationState {
-    type: DeleteType;
+interface DragItemState {
+    type: 'category' | 'item';
     catName: string;
-    itemName?: string;
+    index: number;
 }
 
 const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ structure, onSave, initialBillUploadCategories }) => {
-    const [internalStructure, setInternalStructure] = useState(structure);
-    const [internalBillFlags, setInternalBillFlags] = useState<string[]>(initialBillUploadCategories);
-    const [isDirty, setIsDirty] = useState(false);
+    // Deep copy for local state
+    const [internalStructure, setInternalStructure] = useState<CustomExpenseStructure>(JSON.parse(JSON.stringify(structure)));
+    const [billFlags, setBillFlags] = useState<string[]>(initialBillUploadCategories);
     
+    // UI State
     const [openCategories, setOpenCategories] = useState<string[]>([]);
-    const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-    const [showAddItemModal, setShowAddItemModal] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
-    const [newCategoryNeedsBill, setNewCategoryNeedsBill] = useState(false);
-    const [newItem, setNewItem] = useState({ name: '', defaultValue: 0 });
-    const [targetCategory, setTargetCategory] = useState('');
-    const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmationState | null>(null);
-    const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
-    const [structureToImport, setStructureToImport] = useState<CustomExpenseStructure | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        setInternalStructure(structure);
-        setInternalBillFlags(initialBillUploadCategories);
-        setIsDirty(false);
-    }, [structure, initialBillUploadCategories]);
-
-    const handleSaveChanges = () => {
-        onSave(internalStructure, internalBillFlags);
-        setIsDirty(false);
-    };
-
-    const handleDiscardChanges = () => {
-        setInternalStructure(structure);
-        setInternalBillFlags(initialBillUploadCategories);
-        setIsDirty(false);
-    };
+    const [newItemNames, setNewItemNames] = useState<{ [category: string]: string }>({});
     
-    const handleItemValueChange = (catName: string, itemIndex: number, value: number) => {
-        setInternalStructure(prev => {
-            const newStructure = { ...prev };
-            const newItems = [...newStructure[catName]];
-            newItems[itemIndex] = { ...newItems[itemIndex], defaultValue: value };
-            newStructure[catName] = newItems;
-            return newStructure;
-        });
-        setIsDirty(true);
-    };
+    // Drag & Drop State
+    const [dragItem, setDragItem] = useState<DragItemState | null>(null);
+    const [dragOverInfo, setDragOverInfo] = useState<{ type: 'category' | 'item', index: number, catName?: string } | null>(null);
+    
+    // Delete Confirmation State
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ type: 'category' | 'item', catName: string, itemName?: string } | null>(null);
 
     const toggleCategory = (catName: string) => {
-        setOpenCategories(prev => prev.includes(catName) ? prev.filter(c => c !== catName) : [...prev, catName]);
+        setOpenCategories(prev => 
+            prev.includes(catName) ? prev.filter(c => c !== catName) : [...prev, catName]
+        );
     };
 
     const handleAddCategory = () => {
-        const trimmedName = newCategoryName.trim();
-        if (!trimmedName) {
-            alert('Category name cannot be empty.');
+        if (!newCategoryName.trim()) return;
+        if (internalStructure[newCategoryName.trim()]) {
+            alert('Category already exists');
             return;
         }
-        if (Object.keys(internalStructure).some(k => k.toLowerCase() === trimmedName.toLowerCase())) {
-            alert('A category with this name already exists.');
-            return;
-        }
-        setInternalStructure(prev => ({ ...prev, [trimmedName]: [] }));
-        
-        if (newCategoryNeedsBill) {
-            setInternalBillFlags(prev => [...prev, trimmedName]);
-        }
-
-        setIsDirty(true);
-        setShowAddCategoryModal(false);
+        setInternalStructure(prev => ({ ...prev, [newCategoryName.trim()]: [] }));
         setNewCategoryName('');
-        setNewCategoryNeedsBill(false);
-    };
-    
-    const handleAddItem = () => {
-        const trimmedName = newItem.name.trim();
-        if (!trimmedName) {
-            alert('Item name cannot be empty.');
-            return;
-        }
-         if (internalStructure[targetCategory].some(i => i.name.toLowerCase() === trimmedName.toLowerCase())) {
-            alert('An item with this name already exists in this category.');
-            return;
-        }
-        setInternalStructure(prev => {
-            const newStructure = { ...prev };
-            newStructure[targetCategory] = [...newStructure[targetCategory], { name: trimmedName, defaultValue: newItem.defaultValue || 0 }];
-            return newStructure;
-        });
-        setIsDirty(true);
-        setShowAddItemModal(false);
-        setNewItem({ name: '', defaultValue: 0 });
     };
 
-    const confirmDeletion = () => {
-        if (!deleteConfirmation) return;
-        const { type, catName, itemName } = deleteConfirmation;
-        if (type === 'category') {
-            setInternalStructure(prev => {
-                const newStructure = { ...prev };
-                delete newStructure[catName];
-                return newStructure;
-            });
-            // Clean up bill setting
-            if (internalBillFlags.includes(catName)) {
-                setInternalBillFlags(prev => prev.filter(c => c !== catName));
-            }
-        } else if (type === 'item' && itemName) {
-            setInternalStructure(prev => {
-                const newStructure = { ...prev };
-                newStructure[catName] = newStructure[catName].filter(item => item.name !== itemName);
-                return newStructure;
-            });
-        }
-        setIsDirty(true);
+    const handleDeleteCategory = (catName: string) => {
+        const newStruct = { ...internalStructure };
+        delete newStruct[catName];
+        setInternalStructure(newStruct);
+        setBillFlags(prev => prev.filter(c => c !== catName));
         setDeleteConfirmation(null);
     };
 
-    const toggleBillRequirement = (catName: string) => {
-        if (internalBillFlags.includes(catName)) {
-            setInternalBillFlags(prev => prev.filter(c => c !== catName));
-        } else {
-            setInternalBillFlags(prev => [...prev, catName]);
+    const handleAddItem = (catName: string) => {
+        const itemName = newItemNames[catName]?.trim();
+        if (!itemName) return;
+        
+        const currentItems = internalStructure[catName];
+        if (currentItems.some(i => i.name === itemName)) {
+            alert('Item already exists in this category');
+            return;
         }
-        setIsDirty(true);
+
+        setInternalStructure(prev => ({
+            ...prev,
+            [catName]: [...prev[catName], { name: itemName, defaultValue: 0 }]
+        }));
+        setNewItemNames(prev => ({ ...prev, [catName]: '' }));
     };
 
-    const handleExport = async () => {
-        if (Object.keys(structure).length === 0) {
-          alert("No structure to export.");
-          return;
+    const handleDeleteItem = (catName: string, itemName: string) => {
+        setInternalStructure(prev => ({
+            ...prev,
+            [catName]: prev[catName].filter(i => i.name !== itemName)
+        }));
+        setDeleteConfirmation(null);
+    };
+    
+    const toggleBillUpload = (catName: string) => {
+        setBillFlags(prev => 
+            prev.includes(catName) ? prev.filter(c => c !== catName) : [...prev, catName]
+        );
+    };
+
+    const saveChanges = () => {
+        onSave(internalStructure, billFlags);
+    };
+
+    // --- Reorder Helpers (Manual Arrows) ---
+    const moveCategory = (index: number, direction: 'up' | 'down') => {
+        const keys = Object.keys(internalStructure);
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= keys.length) return;
+
+        const newKeys = [...keys];
+        const [movedKey] = newKeys.splice(index, 1);
+        newKeys.splice(newIndex, 0, movedKey);
+
+        const newStruct: CustomExpenseStructure = {};
+        newKeys.forEach(k => newStruct[k] = internalStructure[k]);
+        setInternalStructure(newStruct);
+    };
+
+    const moveItem = (catName: string, index: number, direction: 'up' | 'down') => {
+        const items = [...internalStructure[catName]];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= items.length) return;
+
+        const [movedItem] = items.splice(index, 1);
+        items.splice(newIndex, 0, movedItem);
+
+        setInternalStructure(prev => ({
+            ...prev,
+            [catName]: items
+        }));
+    };
+
+    // --- DnD Handlers for Categories ---
+    const handleDragStartCategory = (e: React.DragEvent, index: number, catName: string) => {
+        setDragItem({ type: 'category', catName, index });
+        e.dataTransfer.effectAllowed = 'move';
+        
+        // Ghost Image
+        const card = e.currentTarget.closest('[data-category-card]');
+        if (card) {
+            e.dataTransfer.setDragImage(card, 0, 0);
         }
-        const jsonString = JSON.stringify(structure, null, 2);
-        const fileName = `ayshas-expense-structure-${new Date().toISOString().split('T')[0]}.json`;
-        await saveStructureFile(fileName, jsonString);
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const text = e.target?.result;
-            if (typeof text !== 'string') throw new Error("File content is not readable.");
-            
-            const data = JSON.parse(text);
-
-            if (isCustomStructure(data)) {
-                setStructureToImport(data);
-                setShowImportConfirmModal(true);
-            } else {
-              throw new Error('Invalid file structure. Please upload a valid expense structure file.');
-            }
-
-          } catch (error) {
-            alert(error instanceof Error ? error.message : 'An unknown error occurred during file processing.');
-          } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
-          }
-        };
-        reader.readAsText(file);
+    const handleDragEndCategory = () => {
+        setDragItem(null);
+        setDragOverInfo(null);
     };
 
-    const confirmImport = () => {
-        if (structureToImport) {
-          setInternalStructure(structureToImport);
-          setIsDirty(true);
+    const handleDragOverCategory = (e: React.DragEvent, index: number) => {
+        e.preventDefault(); 
+        if (dragItem?.type !== 'category') return;
+        setDragOverInfo({ type: 'category', index });
+    };
+
+    const handleDropCategory = (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        if (dragItem?.type !== 'category') return;
+
+        const keys = Object.keys(internalStructure);
+        const draggedKey = keys[dragItem.index];
+        
+        const newKeys = [...keys];
+        newKeys.splice(dragItem.index, 1);
+        newKeys.splice(dropIndex, 0, draggedKey);
+        
+        const newStruct: CustomExpenseStructure = {};
+        newKeys.forEach(k => newStruct[k] = internalStructure[k]);
+        
+        setInternalStructure(newStruct);
+        handleDragEndCategory();
+    };
+
+    // --- DnD Handlers for Items ---
+    const handleDragStartItem = (e: React.DragEvent, catName: string, index: number) => {
+        e.stopPropagation();
+        setDragItem({ type: 'item', catName, index });
+        e.dataTransfer.effectAllowed = 'move';
+        
+        const row = e.currentTarget.closest('[data-item-row]');
+        if (row) {
+            e.dataTransfer.setDragImage(row, 0, 0);
         }
-        setShowImportConfirmModal(false);
-        setStructureToImport(null);
     };
 
-    const cancelImport = () => {
-        setShowImportConfirmModal(false);
-        setStructureToImport(null);
+    const handleDragEndItem = (e: React.DragEvent) => {
+        e.stopPropagation();
+        setDragItem(null);
+        setDragOverInfo(null);
     };
 
-    const sortedCategories = Object.keys(internalStructure).sort((a, b) => a.localeCompare(b));
-    const inputStyles = "w-full px-3 py-2 border border-surface-outline/50 dark:border-surface-outline-dark/50 rounded-lg shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 dark:bg-surface-dark-container-high dark:text-surface-on-dark transition";
-    const buttonClass = "flex items-center justify-center px-4 py-2 text-sm font-semibold text-primary dark:text-primary-dark border border-surface-outline/30 dark:border-surface-outline-dark/30 hover:bg-surface-variant/20 rounded-lg transition-colors w-full sm:w-auto";
+    const handleDragOverItem = (e: React.DragEvent, catName: string, index: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (dragItem?.type !== 'item' || dragItem.catName !== catName) return;
+        setDragOverInfo({ type: 'item', index, catName });
+    };
+
+    const handleDropItem = (e: React.DragEvent, catName: string, dropIndex: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (dragItem?.type !== 'item' || dragItem.catName !== catName) return;
+
+        const items = [...internalStructure[catName]];
+        const [movedItem] = items.splice(dragItem.index, 1);
+        items.splice(dropIndex, 0, movedItem);
+
+        setInternalStructure(prev => ({ ...prev, [catName]: items }));
+        handleDragEndItem(e);
+    };
+
+    const categoryKeys = Object.keys(internalStructure);
 
     return (
-        <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:space-x-2 gap-2 sm:gap-0 pb-4 border-b border-surface-outline/10 dark:border-surface-outline-dark/10">
-                <button onClick={handleExport} className={buttonClass}>
-                    <DownloadIcon className="w-4 h-4 mr-2"/>
-                    Export Structure (.json)
-                </button>
-                <button onClick={() => fileInputRef.current?.click()} className={buttonClass}>
-                    <UploadIcon className="w-4 h-4 mr-2"/>
-                    Import Structure (.json)
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="application/json"
-                  className="hidden"
+        <div className="space-y-6 pb-20">
+            {/* Add Category Section */}
+            <div className="flex gap-2">
+                <input 
+                    type="text" 
+                    placeholder="New Category Name" 
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="flex-grow px-4 py-2 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"
                 />
+                <button 
+                    onClick={handleAddCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="w-10 h-10 flex items-center justify-center bg-primary dark:bg-primary-dark text-white rounded-xl disabled:opacity-50"
+                >
+                    <PlusIcon className="w-6 h-6" />
+                </button>
             </div>
 
-            {sortedCategories.map(catName => {
-                const needsBill = internalBillFlags.includes(catName);
-                return (
-                <div key={catName} className="bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
-                    <div className="flex items-center p-3 gap-2">
-                        <button onClick={() => toggleCategory(catName)} className="flex-grow flex items-center text-left">
-                            <ChevronDownIcon className={`w-5 h-5 mr-2 text-surface-on-variant dark:text-surface-on-variant-dark transform transition-transform ${openCategories.includes(catName) ? 'rotate-180' : ''}`} />
-                            <span className="font-semibold text-primary dark:text-primary-dark">{catName}</span>
-                        </button>
-                        
-                        <button 
-                            onClick={() => toggleBillRequirement(catName)} 
-                            className={`p-2 rounded-full transition-colors ${needsBill ? 'bg-primary/20 text-primary dark:text-primary-dark' : 'text-surface-outline dark:text-surface-outline-dark hover:bg-surface-variant/10'}`}
-                            title={needsBill ? "Bill upload enabled" : "Enable bill upload"}
-                        >
-                            <CameraIcon className="w-5 h-5"/>
-                        </button>
+            {/* Categories List */}
+            <div className="space-y-3">
+                {categoryKeys.map((catName, catIndex) => {
+                    const isCatDragging = dragItem?.type === 'category' && dragItem.index === catIndex;
+                    const isCatDragOver = dragOverInfo?.type === 'category' && dragOverInfo.index === catIndex;
 
-                        <button onClick={() => setDeleteConfirmation({ type: 'category', catName })} className="p-2 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark rounded-full hover:bg-surface-variant/10" aria-label="Delete category">
-                            <TrashIcon className="w-5 h-5"/>
-                        </button>
-                    </div>
-                    {openCategories.includes(catName) && (
-                        <div className="px-3 pb-3 space-y-2">
-                            {internalStructure[catName].map((item, itemIndex) => (
-                                <div key={item.name} className="grid grid-cols-[1fr_auto] items-center p-2 gap-x-2 rounded bg-surface-container dark:bg-surface-dark-container">
-                                    <span className="text-surface-on dark:text-surface-on-dark truncate font-medium">{item.name}</span>
-                                    <button onClick={() => setDeleteConfirmation({ type: 'item', catName, itemName: item.name })} className="p-1 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark" aria-label="Delete item">
-                                        <TrashIcon className="w-4 h-4"/>
+                    return (
+                        <div 
+                            key={catName} 
+                            data-category-card
+                            onDragOver={(e) => handleDragOverCategory(e, catIndex)}
+                            onDrop={(e) => handleDropCategory(e, catIndex)}
+                            className={`bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl overflow-hidden border transition-all duration-200 ${
+                                isCatDragOver 
+                                ? 'border-primary dark:border-primary-dark ring-2 ring-primary/20 dark:ring-primary-dark/20 z-10 scale-[1.01]' 
+                                : 'border-surface-outline/5 dark:border-surface-outline-dark/5'
+                            } ${isCatDragging ? 'opacity-30' : ''}`}
+                        >
+                            <div className="flex items-center justify-between p-3 bg-surface-container-highest/30 dark:bg-surface-dark-container-highest/30">
+                                {/* Drag Handle */}
+                                <div 
+                                    draggable
+                                    onDragStart={(e) => handleDragStartCategory(e, catIndex, catName)}
+                                    onDragEnd={handleDragEndCategory}
+                                    className="mr-2 cursor-grab active:cursor-grabbing text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 hover:text-surface-on dark:hover:text-surface-on-dark p-2 -ml-2"
+                                >
+                                    <DragHandleIcon className="w-5 h-5" />
+                                </div>
+
+                                <button onClick={() => toggleCategory(catName)} className="flex items-center gap-2 font-bold text-surface-on dark:text-surface-on-dark text-sm flex-grow text-left">
+                                    {openCategories.includes(catName) ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                                    {catName} ({internalStructure[catName].length})
+                                </button>
+
+                                {/* Category Actions */}
+                                <div className="flex items-center gap-1">
+                                    <button 
+                                        onClick={() => moveCategory(catIndex, 'up')}
+                                        disabled={catIndex === 0}
+                                        className="p-1.5 text-surface-on-variant/50 hover:text-primary disabled:opacity-20"
+                                    >
+                                        <ArrowUpIcon className="w-4 h-4" />
                                     </button>
-                                    <div className="relative col-span-2 mt-1">
-                                        <label htmlFor={`default-${catName}-${itemIndex}`} className="absolute -top-2 left-2 text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container dark:bg-surface-dark-container px-1 rounded">Default</label>
-                                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-surface-on-variant dark:text-surface-on-variant-dark pointer-events-none">₹</span>
-                                        <input
-                                        type="number"
-                                        id={`default-${catName}-${itemIndex}`}
-                                        value={item.defaultValue === 0 ? '' : item.defaultValue}
-                                        onChange={(e) => handleItemValueChange(catName, itemIndex, parseFloat(e.target.value) || 0)}
-                                        className="w-full pl-7 pr-2 py-1 text-sm bg-transparent border border-surface-outline/50 dark:border-surface-outline-dark/50 rounded-md shadow-sm focus:ring-1 focus:ring-primary dark:focus:ring-primary-dark focus:border-primary dark:focus:border-primary-dark text-surface-on dark:text-surface-on-dark transition"
-                                        placeholder="0"
+                                    <button 
+                                        onClick={() => moveCategory(catIndex, 'down')}
+                                        disabled={catIndex === categoryKeys.length - 1}
+                                        className="p-1.5 text-surface-on-variant/50 hover:text-primary disabled:opacity-20"
+                                    >
+                                        <ArrowDownIcon className="w-4 h-4" />
+                                    </button>
+                                    <div className="w-px h-4 bg-surface-outline/20 mx-1"></div>
+                                    <button onClick={() => setDeleteConfirmation({ type: 'category', catName })} className="p-1.5 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark transition-colors">
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {openCategories.includes(catName) && (
+                                <div className="px-3 pb-3 space-y-2">
+                                    {/* Items List */}
+                                    {internalStructure[catName].map((item, itemIndex) => {
+                                        const isItemDragging = dragItem?.type === 'item' && dragItem.catName === catName && dragItem.index === itemIndex;
+                                        const isItemDragOver = dragOverInfo?.type === 'item' && dragOverInfo.catName === catName && dragOverInfo.index === itemIndex;
+
+                                        return (
+                                            <div 
+                                                key={item.name} 
+                                                data-item-row
+                                                onDragOver={(e) => handleDragOverItem(e, catName, itemIndex)}
+                                                onDrop={(e) => handleDropItem(e, catName, itemIndex)}
+                                                className={`grid grid-cols-[auto_1fr_auto_auto] items-center p-2 gap-x-2 rounded bg-surface-container dark:bg-surface-dark-container transition-all ${
+                                                    isItemDragOver ? 'ring-2 ring-primary/30 dark:ring-primary-dark/30 scale-[0.98]' : ''
+                                                } ${isItemDragging ? 'opacity-30' : ''}`}
+                                            >
+                                                {/* Drag Handle Item */}
+                                                <div 
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStartItem(e, catName, itemIndex)}
+                                                    onDragEnd={handleDragEndItem}
+                                                    className="cursor-grab active:cursor-grabbing text-surface-on-variant/30 dark:text-surface-on-variant-dark/30 hover:text-surface-on dark:hover:text-surface-on-dark row-span-2 self-center p-1"
+                                                >
+                                                    <DragHandleIcon className="w-4 h-4" />
+                                                </div>
+
+                                                <span className="text-surface-on dark:text-surface-on-dark font-medium break-words leading-tight">{item.name}</span>
+                                                
+                                                {/* Item Move Arrows */}
+                                                <div className="flex flex-col gap-0.5 row-span-2">
+                                                    <button 
+                                                        onClick={() => moveItem(catName, itemIndex, 'up')}
+                                                        disabled={itemIndex === 0}
+                                                        className="p-0.5 text-surface-on-variant/40 hover:text-primary disabled:opacity-10"
+                                                    >
+                                                        <ArrowUpIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => moveItem(catName, itemIndex, 'down')}
+                                                        disabled={itemIndex === internalStructure[catName].length - 1}
+                                                        className="p-0.5 text-surface-on-variant/40 hover:text-primary disabled:opacity-10"
+                                                    >
+                                                        <ArrowDownIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+
+                                                <button onClick={() => setDeleteConfirmation({ type: 'item', catName, itemName: item.name })} className="p-1 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark row-span-2" aria-label="Delete item">
+                                                    <TrashIcon className="w-4 h-4"/>
+                                                </button>
+
+                                                <div className="relative col-span-2 col-start-2 mt-1">
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="Default Amount"
+                                                        value={item.defaultValue || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value);
+                                                            setInternalStructure(prev => ({
+                                                                ...prev,
+                                                                [catName]: prev[catName].map(i => i.name === item.name ? { ...i, defaultValue: isNaN(val) ? 0 : val } : i)
+                                                            }));
+                                                        }}
+                                                        className="w-full text-xs p-1.5 bg-transparent border-b border-surface-outline/20 dark:border-surface-outline-dark/20 focus:border-primary dark:focus:border-primary-dark outline-none text-surface-on-variant dark:text-surface-on-variant-dark"
+                                                    />
+                                                    <span className="absolute right-0 top-1.5 text-[10px] text-surface-on-variant/50">Default</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Add Item Input */}
+                                    <div className="flex gap-2 mt-2 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Add Item..." 
+                                            value={newItemNames[catName] || ''}
+                                            onChange={(e) => setNewItemNames(prev => ({ ...prev, [catName]: e.target.value }))}
+                                            className="flex-grow px-3 py-1.5 text-sm bg-surface-container dark:bg-surface-dark-container rounded-lg outline-none focus:ring-1 focus:ring-primary dark:focus:ring-primary-dark"
+                                            onKeyDown={(e) => e.key === 'Enter' && handleAddItem(catName)}
                                         />
+                                        <button 
+                                            onClick={() => handleAddItem(catName)}
+                                            disabled={!newItemNames[catName]?.trim()}
+                                            className="px-3 py-1.5 bg-secondary-container dark:bg-secondary-container-dark text-secondary-on-container dark:text-secondary-on-container-dark rounded-lg text-xs font-bold disabled:opacity-50"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Category Settings */}
+                                    <div className="mt-3 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={billFlags.includes(catName)} 
+                                                onChange={() => toggleBillUpload(catName)}
+                                                className="w-4 h-4 rounded text-primary dark:text-primary-dark focus:ring-primary dark:focus:ring-primary-dark bg-transparent border-surface-outline/30"
+                                            />
+                                            <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Allow Bill Photo Uploads</span>
+                                        </label>
                                     </div>
                                 </div>
-                            ))}
-                            <button onClick={() => { setTargetCategory(catName); setShowAddItemModal(true); }} className="w-full text-sm flex items-center justify-center p-2 rounded text-secondary dark:text-secondary-dark hover:bg-secondary-container/20 dark:hover:bg-secondary-container-dark/20 transition-colors">
-                                <PlusIcon className="w-4 h-4 mr-1"/> Add Item
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Save Button */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-surface dark:bg-surface-dark border-t border-surface-outline/10 dark:border-surface-outline-dark/10 flex justify-end gap-2">
+                <button 
+                    onClick={saveChanges}
+                    className="w-full sm:w-auto px-8 py-3 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+                >
+                    Save Changes
+                </button>
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-surface-container dark:bg-surface-dark-container rounded-2xl p-6 w-full max-w-sm shadow-xl animate-scaleIn">
+                        <h3 className="text-lg font-bold text-surface-on dark:text-surface-on-dark mb-2">Confirm Delete</h3>
+                        <p className="text-sm text-surface-on-variant dark:text-surface-on-variant-dark mb-6">
+                            Are you sure you want to delete the {deleteConfirmation.type} 
+                            <span className="font-bold text-error dark:text-error-dark"> "{deleteConfirmation.itemName || deleteConfirmation.catName}"</span>?
+                            {deleteConfirmation.type === 'category' && " This will remove all items inside it."}
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => setDeleteConfirmation(null)}
+                                className="px-4 py-2 text-sm font-bold text-surface-on-variant dark:text-surface-on-variant-dark hover:bg-surface-container-highest dark:hover:bg-surface-dark-container-highest rounded-full"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => deleteConfirmation.type === 'category' ? handleDeleteCategory(deleteConfirmation.catName) : handleDeleteItem(deleteConfirmation.catName, deleteConfirmation.itemName!)}
+                                className="px-4 py-2 text-sm font-bold bg-error dark:bg-error-dark text-white rounded-full shadow-sm"
+                            >
+                                Delete
                             </button>
                         </div>
-                    )}
+                    </div>
                 </div>
-            )})}
-            <button onClick={() => setShowAddCategoryModal(true)} className="w-full text-sm font-semibold flex items-center justify-center p-2.5 rounded-xl border-2 border-dashed border-primary/50 dark:border-primary-dark/50 text-primary dark:text-primary-dark hover:bg-primary-container/10 dark:hover:bg-primary-container-dark/10 transition-colors">
-                <PlusIcon className="w-5 h-5 mr-2"/> Add New Category
-            </button>
-
-            {isDirty && (
-                <div className="flex justify-end space-x-3 pt-4 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
-                    <button onClick={handleDiscardChanges} className="px-4 py-2 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-surface-on dark:text-surface-on-dark hover:bg-surface-variant/10">Discard</button>
-                    <button onClick={handleSaveChanges} className="px-4 py-2 bg-secondary dark:bg-secondary-dark text-white dark:text-secondary-on-dark rounded-full hover:bg-secondary/90">Save Changes</button>
-                </div>
-            )}
-
-            {/* Modals */}
-            {showAddCategoryModal && (
-                <Modal onClose={() => setShowAddCategoryModal(false)}>
-                    <div className="p-4 bg-surface-container dark:bg-surface-dark-container rounded-[24px]">
-                        <h3 className="text-xl font-bold mb-4 text-surface-on dark:text-surface-on-dark">Add New Category</h3>
-                        <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="e.g., Beverages" className={inputStyles} />
-                        
-                        <label className="flex items-center space-x-3 mt-4 p-2 cursor-pointer">
-                            <input 
-                                type="checkbox" 
-                                checked={newCategoryNeedsBill} 
-                                onChange={(e) => setNewCategoryNeedsBill(e.target.checked)} 
-                                className="w-5 h-5 text-primary dark:text-primary-dark border-surface-outline rounded focus:ring-primary dark:focus:ring-primary-dark bg-transparent"
-                            />
-                            <div className="flex flex-col">
-                                <span className="text-sm font-medium text-surface-on dark:text-surface-on-dark">Needs Bill Proof?</span>
-                                <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Show camera button for items in this category.</span>
-                            </div>
-                        </label>
-
-                        <div className="mt-6 flex justify-end space-x-3">
-                            <button onClick={() => setShowAddCategoryModal(false)} className="px-4 py-2 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-surface-on dark:text-surface-on-dark hover:bg-surface-variant/10">Cancel</button>
-                            <button onClick={handleAddCategory} className="px-4 py-2 bg-secondary dark:bg-secondary-dark text-white dark:text-secondary-on-dark rounded-full hover:bg-secondary/90">Add</button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-            {showAddItemModal && (
-                <Modal onClose={() => setShowAddItemModal(false)}>
-                    <div className="p-4 bg-surface-container dark:bg-surface-dark-container rounded-[24px]">
-                        <h3 className="text-xl font-bold mb-4 text-surface-on dark:text-surface-on-dark">Add New Item to "{targetCategory}"</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label htmlFor="newItemName" className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Item Name</label>
-                                <input type="text" id="newItemName" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="e.g., Soda" className={inputStyles} />
-                            </div>
-                            <div>
-                                <label htmlFor="newItemDefault" className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Default Pre-fill Amount</label>
-                                <input type="number" id="newItemDefault" value={newItem.defaultValue === 0 ? '' : newItem.defaultValue} onChange={e => setNewItem({...newItem, defaultValue: parseFloat(e.target.value) || 0})} placeholder="0" className={inputStyles} />
-                            </div>
-                        </div>
-                        <div className="mt-6 flex justify-end space-x-3">
-                            <button onClick={() => setShowAddItemModal(false)} className="px-4 py-2 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-surface-on dark:text-surface-on-dark hover:bg-surface-variant/10">Cancel</button>
-                            <button onClick={handleAddItem} className="px-4 py-2 bg-secondary dark:bg-secondary-dark text-white dark:text-secondary-on-dark rounded-full hover:bg-secondary/90">Add</button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-            {deleteConfirmation && (
-                 <Modal onClose={() => setDeleteConfirmation(null)}>
-                    <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[24px] text-center">
-                        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-error-container dark:bg-error-container-dark">
-                            <WarningIcon className="h-6 w-6 text-error dark:text-error-dark" />
-                        </div>
-                        <h3 className="text-xl font-bold mt-4 mb-2 text-surface-on dark:text-surface-on-dark">Confirm Deletion</h3>
-                        <p className="text-surface-on-variant dark:text-surface-on-variant-dark mb-6">
-                            Are you sure you want to permanently delete <br/> <span className="font-semibold text-surface-on dark:text-surface-on-dark">{deleteConfirmation.itemName || deleteConfirmation.catName}</span>?
-                            {deleteConfirmation.type === 'category' && <span className="block text-sm mt-1 text-tertiary dark:text-tertiary-dark">This will also delete all items within this category.</span>}
-                        </p>
-                        <div className="flex justify-center space-x-4">
-                            <button type="button" onClick={() => setDeleteConfirmation(null)} className="px-5 py-2.5 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-sm font-semibold text-surface-on dark:text-surface-on-dark hover:bg-surface-variant/10 transition-colors">Cancel</button>
-                            <button type="button" onClick={confirmDeletion} className="px-5 py-2.5 bg-error dark:bg-error-dark text-white dark:text-error-on-dark rounded-full text-sm font-semibold hover:bg-error/90 shadow-sm transition-colors">Delete</button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-            {showImportConfirmModal && structureToImport && (
-                <Modal onClose={cancelImport}>
-                    <div className="p-4 text-center bg-surface-container dark:bg-surface-dark-container rounded-[24px]">
-                        <h3 className="text-xl font-bold mb-4 text-surface-on dark:text-surface-on-dark">Confirm Structure Import</h3>
-                        <p className="text-surface-on-variant dark:text-surface-on-variant-dark mb-2">
-                            This will replace your current expense structure with the data from the imported file.
-                        </p>
-                        <p className="text-tertiary-on-container dark:text-tertiary-on-container-dark font-semibold bg-tertiary-container dark:bg-tertiary-container-dark p-3 rounded-md mt-4 text-sm">
-                            This change is temporary. You must click "Save Changes" to make it permanent.
-                        </p>
-                        <div className="mt-6 flex justify-center space-x-4">
-                            <button onClick={cancelImport} className="px-6 py-2 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-surface-on dark:text-surface-on-dark hover:bg-surface-variant/10">Cancel</button>
-                            <button onClick={confirmImport} className="px-6 py-2 bg-secondary dark:bg-secondary-dark text-white dark:text-secondary-on-dark rounded-full hover:bg-secondary/90">Confirm & Load</button>
-                        </div>
-                    </div>
-                </Modal>
             )}
         </div>
     );
