@@ -304,7 +304,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const handleRestore = async (data: BackupData): Promise<number> => {
         await db.clearRecords();
-        await db.bulkAddRecords(data.records);
+        
+        // Run migration on restored records to ensure compatibility
+        const { migratedRecords } = runMigration(data.records);
+        
+        await db.bulkAddRecords(migratedRecords);
         await db.saveCustomStructure(data.customStructure);
 
         // Load Optional Legacy Data
@@ -323,9 +327,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setGasConfig(data.gasConfig);
         }
 
-        setRecords(data.records);
+        setRecords(migratedRecords);
         setCustomStructure(data.customStructure);
-        return data.records.length;
+        return migratedRecords.length;
     };
 
     const handleUpdateStructure = async (newStructure: CustomExpenseStructure) => {

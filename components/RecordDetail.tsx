@@ -15,6 +15,7 @@ const RecordDetail: React.FC = () => {
   const { getRecordById, handleDelete } = useAppContext();
   const [viewingPhotos, setViewingPhotos] = useState<string[] | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [isSharing, setIsSharing] = useState(false);
 
   const record = useMemo(() => {
     if (recordId) return getRecordById(recordId);
@@ -35,17 +36,18 @@ const RecordDetail: React.FC = () => {
 
   const handleShare = async () => {
     const reportElement = document.getElementById('shareable-report');
-    if (!reportElement) return;
+    if (!reportElement || isSharing) return;
     
-    // Temporarily show the hidden report to capture it
-    reportElement.style.display = 'block';
+    setIsSharing(true);
     
     try {
         const canvas = await html2canvas(reportElement, {
             scale: 2, // Higher quality
             backgroundColor: null,
             useCORS: true,
+            logging: false,
         });
+        
         const base64Image = canvas.toDataURL('image/png');
         const fileName = `report_${record.date}.png`;
         const title = `P&L Report - ${record.date}`;
@@ -59,7 +61,7 @@ const RecordDetail: React.FC = () => {
         console.error("Share failed", error);
         alert("Failed to generate image for sharing.");
     } finally {
-        reportElement.style.display = 'none';
+        setIsSharing(false);
     }
   };
   
@@ -83,8 +85,13 @@ const RecordDetail: React.FC = () => {
             <BackIcon className="w-5 h-5 text-surface-on dark:text-surface-on-dark" />
         </button>
         <div className="flex gap-2">
-            <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 bg-secondary-container dark:bg-secondary-container-dark text-secondary-on-container dark:text-secondary-on-container-dark rounded-full text-sm font-bold hover:opacity-90 transition-opacity">
-                <ShareIcon className="w-4 h-4" /> Share
+            <button 
+                onClick={handleShare} 
+                disabled={isSharing}
+                className="flex items-center gap-2 px-4 py-2 bg-secondary-container dark:bg-secondary-container-dark text-secondary-on-container dark:text-secondary-on-container-dark rounded-full text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+                <ShareIcon className="w-4 h-4" /> 
+                {isSharing ? 'Sharing...' : 'Share'}
             </button>
             <button onClick={() => navigate(`/records/${record.id}/edit`)} className="p-2.5 rounded-full bg-primary/10 dark:bg-primary-dark/20 text-primary dark:text-primary-dark hover:bg-primary/20 transition-colors">
                 <PencilSquareIcon className="w-5 h-5" />
@@ -154,7 +161,6 @@ const RecordDetail: React.FC = () => {
                 <ul className="divide-y divide-surface-outline/5 dark:divide-surface-outline-dark/5 bg-surface-container-low dark:bg-surface-dark-container-low">
                     {category.items.map(item => item.amount > 0 && (
                         <li key={item.id} className="px-3 py-2 flex justify-between items-center text-sm">
-                            {/* FIX: break-words added here */}
                             <span className="text-surface-on dark:text-surface-on-dark flex-1 pr-2 break-words">{item.name}</span>
                             <div className="flex items-center space-x-3 flex-shrink-0">
                                 {(item.billPhotos && item.billPhotos.length > 0) && (
@@ -181,8 +187,8 @@ const RecordDetail: React.FC = () => {
         </button>
       </div>
 
-      {/* Hidden Report for Generation */}
-      <div style={{ display: 'none' }}>
+      {/* Hidden Report for Generation (Fixed Position Off-screen) */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '0', zIndex: -1 }}>
         <ShareableReport record={record} id="shareable-report" />
       </div>
 

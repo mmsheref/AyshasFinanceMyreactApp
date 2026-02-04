@@ -1,3 +1,4 @@
+
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -173,11 +174,14 @@ export const shareBackupData = async (fileName: string, data: string, title: str
 export const shareImageFile = async (fileName: string, base64Data: string, title: string, text: string) => {
     try {
         if (Capacitor.isNativePlatform()) {
-            // Native: Save the base64 data URL as a file in the cache directory,
-            // then share the resulting file URI.
+            // Native: Save the base64 data URL as a file in the cache directory.
+            // IMPORTANT: Strip the 'data:image/...' prefix for Filesystem.writeFile on binary data
+            // to avoid potential encoding issues causing crashes on Android.
+            const dataToWrite = base64Data.replace(/^data:image\/\w+;base64,/, "");
+
             const result = await Filesystem.writeFile({
                 path: fileName,
-                data: base64Data, // Capacitor's writeFile can handle data URLs
+                data: dataToWrite, 
                 directory: Directory.Cache,
             });
 
@@ -207,7 +211,6 @@ export const shareImageFile = async (fileName: string, base64Data: string, title
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-                alert('Report image downloaded.');
             }
         }
     } catch (error) {

@@ -172,7 +172,8 @@ const Reports: React.FC = () => {
             rec.expenses.forEach(cat => {
                 const categoryTotal = cat.items.reduce((sum, item) => sum + item.amount, 0);
                 
-                if (cat.name.toLowerCase() === 'labours') {
+                // Matches Dashboard logic
+                if (cat.name.toLowerCase().includes('labour') || cat.name.toLowerCase().includes('labor')) {
                     totalLaborCost += categoryTotal;
                 }
                 if (foodCostCategories.includes(cat.name)) {
