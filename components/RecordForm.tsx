@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { DailyRecord, ExpenseCategory, ExpenseItem } from '../types';
 import { generateNewRecordExpenses } from '../constants';
 import { getTodayDateString } from '../utils/record-utils';
-import { ChevronDownIcon, CheckIcon, TrashIcon, PlusIcon } from './Icons';
+import { ChevronDownIcon, CheckIcon, TrashIcon, PlusIcon, SearchIcon, XMarkIcon } from './Icons';
 import ImageUpload from './ImageUpload';
 
 const RecordForm: React.FC = () => {
@@ -28,6 +28,7 @@ const RecordForm: React.FC = () => {
     const [morningSales, setMorningSales] = useState<string>('');
     const [totalSales, setTotalSales] = useState<string>('');
     const [expenses, setExpenses] = useState<ExpenseCategory[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
     
     // Status State: 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED'
     const [status, setStatus] = useState<'IN_PROGRESS' | 'COMPLETED' | 'CLOSED'>('IN_PROGRESS');
@@ -142,6 +143,17 @@ const RecordForm: React.FC = () => {
         setNewItemInputs(prev => ({ ...prev, [categoryId]: '' }));
         setSaveToPermanent(prev => ({ ...prev, [categoryId]: false }));
     };
+
+    const displayedExpenses = useMemo(() => {
+        if (!searchTerm.trim()) return expenses;
+        const lowerTerm = searchTerm.toLowerCase();
+        
+        // Filter categories and items
+        return expenses.map(cat => ({
+            ...cat,
+            items: cat.items.filter(item => item.name.toLowerCase().includes(lowerTerm))
+        })).filter(cat => cat.items.length > 0);
+    }, [expenses, searchTerm]);
 
     const currentTotalExpenses = useMemo(() => {
         return expenses.reduce((total, cat) => 
@@ -290,7 +302,7 @@ const RecordForm: React.FC = () => {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1 ml-1">Morning Sales (Optional)</label>
+                            <label className="block text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1 ml-1 Morning Sales (Optional)">Morning Sales (Optional)</label>
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-on-variant dark:text-surface-on-variant-dark font-bold">₹</span>
                                 <input 
@@ -313,9 +325,31 @@ const RecordForm: React.FC = () => {
                     <h3 className="text-sm font-bold text-surface-on-variant dark:text-surface-on-variant-dark uppercase tracking-wider">Expenses</h3>
                     <button type="button" onClick={() => setExpandedCategories([])} className="text-xs text-primary dark:text-primary-dark font-medium">Collapse All</button>
                 </div>
+
+                {/* Search Bar */}
+                <div className="relative px-1">
+                    <input
+                        type="text"
+                        placeholder="Search items..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-10 py-2.5 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl text-sm text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark transition-all"
+                    />
+                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-on-variant dark:text-surface-on-variant-dark" />
+                    {searchTerm && (
+                        <button 
+                            type="button"
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-surface-on-variant hover:bg-surface-variant/20"
+                        >
+                            <XMarkIcon className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
                 
-                {expenses.map((category) => {
-                    const isExpanded = expandedCategories.includes(category.name);
+                {displayedExpenses.map((category) => {
+                    const isSearching = searchTerm.trim().length > 0;
+                    const isExpanded = isSearching || expandedCategories.includes(category.name);
                     const catTotal = category.items.reduce((sum, item) => sum + (item.amount || 0), 0);
                     const activeCount = category.items.filter(i => i.amount > 0).length;
                     const canUpload = billUploadCategories.includes(category.name);
@@ -387,54 +421,56 @@ const RecordForm: React.FC = () => {
                                         );
                                     })}
 
-                                    {/* Polished Add New Item Section */}
-                                    <div className="mt-4 pt-4 border-t border-dashed border-surface-outline/20 dark:border-surface-outline-dark/20">
-                                        <div className="flex flex-col gap-3">
-                                            <div className="flex gap-2 items-center">
-                                                <div className="relative flex-grow">
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Add custom item..." 
-                                                        value={newItemInputs[category.id] || ''}
-                                                        onChange={(e) => setNewItemInputs(prev => ({...prev, [category.id]: e.target.value}))}
-                                                        className="w-full bg-surface-container-highest/30 dark:bg-surface-dark-container-highest/30 rounded-xl pl-3 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 dark:focus:ring-primary-dark/50 transition-all placeholder-surface-on-variant/40 text-surface-on dark:text-surface-on-dark"
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                handleAddItem(category.id, category.name);
-                                                            }
-                                                        }}
-                                                    />
-                                                </div>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => handleAddItem(category.id, category.name)}
-                                                    disabled={!newItemInputs[category.id]?.trim()}
-                                                    className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-primary dark:bg-primary-dark text-white dark:text-primary-on-dark rounded-xl disabled:opacity-50 disabled:bg-surface-container-highest disabled:text-surface-on-variant/50 transition-all shadow-sm active:scale-95"
-                                                >
-                                                    <PlusIcon className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                            
-                                            {/* Save to Permanent Option - Animated */}
-                                            <div className={`flex items-center gap-2 px-1 transition-all duration-300 overflow-hidden ${newItemInputs[category.id]?.trim() ? 'max-h-10 opacity-100' : 'max-h-0 opacity-0'}`}>
-                                                <label className="flex items-center gap-3 cursor-pointer group select-none">
-                                                    <div className="relative inline-flex items-center cursor-pointer">
+                                    {/* Polished Add New Item Section - Hidden during search */}
+                                    {!isSearching && (
+                                        <div className="mt-4 pt-4 border-t border-dashed border-surface-outline/20 dark:border-surface-outline-dark/20">
+                                            <div className="flex flex-col gap-3">
+                                                <div className="flex gap-2 items-center">
+                                                    <div className="relative flex-grow">
                                                         <input 
-                                                            type="checkbox" 
-                                                            className="sr-only peer" 
-                                                            checked={saveToPermanent[category.id] || false}
-                                                            onChange={(e) => setSaveToPermanent(prev => ({...prev, [category.id]: e.target.checked}))}
+                                                            type="text" 
+                                                            placeholder="Add custom item..." 
+                                                            value={newItemInputs[category.id] || ''}
+                                                            onChange={(e) => setNewItemInputs(prev => ({...prev, [category.id]: e.target.value}))}
+                                                            className="w-full bg-surface-container-highest/30 dark:bg-surface-dark-container-highest/30 rounded-xl pl-3 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 dark:focus:ring-primary-dark/50 transition-all placeholder-surface-on-variant/40 text-surface-on dark:text-surface-on-dark"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    handleAddItem(category.id, category.name);
+                                                                }
+                                                            }}
                                                         />
-                                                        <div className="w-9 h-5 bg-surface-variant dark:bg-surface-dark-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 dark:peer-focus:ring-primary-dark/20 rounded-full peer dark:bg-surface-dark-container-highest peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary dark:peer-checked:bg-primary-dark"></div>
                                                     </div>
-                                                    <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark group-hover:text-primary dark:group-hover:text-primary-dark transition-colors">
-                                                        Save to permanent list
-                                                    </span>
-                                                </label>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleAddItem(category.id, category.name)}
+                                                        disabled={!newItemInputs[category.id]?.trim()}
+                                                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-primary dark:bg-primary-dark text-white dark:text-primary-on-dark rounded-xl disabled:opacity-50 disabled:bg-surface-container-highest disabled:text-surface-on-variant/50 transition-all shadow-sm active:scale-95"
+                                                    >
+                                                        <PlusIcon className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                                
+                                                {/* Save to Permanent Option - Animated */}
+                                                <div className={`flex items-center gap-2 px-1 transition-all duration-300 overflow-hidden ${newItemInputs[category.id]?.trim() ? 'max-h-10 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                                    <label className="flex items-center gap-3 cursor-pointer group select-none">
+                                                        <div className="relative inline-flex items-center cursor-pointer">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="sr-only peer" 
+                                                                checked={saveToPermanent[category.id] || false}
+                                                                onChange={(e) => setSaveToPermanent(prev => ({...prev, [category.id]: e.target.checked}))}
+                                                            />
+                                                            <div className="w-9 h-5 bg-surface-variant dark:bg-surface-dark-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 dark:peer-focus:ring-primary-dark/20 rounded-full peer dark:bg-surface-dark-container-highest peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary dark:peer-checked:bg-primary-dark"></div>
+                                                        </div>
+                                                        <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark group-hover:text-primary dark:group-hover:text-primary-dark transition-colors">
+                                                            Save to permanent list
+                                                        </span>
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                         </div>
